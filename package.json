@@ -9,7 +9,7 @@
     "seed": "npm --prefix server run seed",
     "test": "npm --prefix server test",
     "build": "npm --prefix client run build",
-    "render-build": "npm --prefix server install && npm --prefix client install && npm --prefix client run build",
+    "render-build": "cd server && npm install && cd ../client && npm install && npm run build",
     "start": "node server/src/server.js"
   },
   "keywords": [
