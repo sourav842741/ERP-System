@@ -1,0 +1,24 @@
+{
+  "name": "erp-system",
+  "version": "1.0.0",
+  "description": "Production Marketplace ERP & Inventory Management System",
+  "scripts": {
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"cyan.bold,magenta.bold\" \"npm run server\" \"npm run client\"",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "seed": "npm --prefix server run seed",
+    "test": "npm --prefix server test",
+    "build": "npm --prefix client run build"
+  },
+  "keywords": [
+    "erp",
+    "inventory",
+    "marketplace",
+    "mern"
+  ],
+  "author": "Antigravity",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
