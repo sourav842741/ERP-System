@@ -26,7 +26,10 @@ export const SocketProvider = ({ children }) => {
   useEffect(() => {
     refreshNotifications();
 
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+    const defaultSocketUrl = typeof window !== 'undefined' && window.location.origin.includes('5173')
+      ? 'http://localhost:5000'
+      : (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000');
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || defaultSocketUrl;
     const s = io(socketUrl, { transports: ['websocket', 'polling'] });
 
     s.on('connect', () => {

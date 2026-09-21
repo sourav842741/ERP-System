@@ -49,6 +49,17 @@ app.get('/api/health', (req, res) => {
 // Mount /api/v1 API routes
 app.use('/api/v1', apiRoutes);
 
+// Serve static frontend assets in production
+const clientDistPath = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientDistPath));
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+    return next();
+  }
+  res.sendFile(path.join(clientDistPath, 'index.html'));
+});
+
 // Error handling
 app.use(notFound);
 app.use(errorHandler);

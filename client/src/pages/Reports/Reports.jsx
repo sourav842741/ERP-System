@@ -12,7 +12,10 @@ export const Reports = () => {
   const handleExport = async (type) => {
     setDownloading(type);
     try {
-      const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+      const defaultBaseUrl = typeof window !== 'undefined' && window.location.origin.includes('5173')
+        ? 'http://localhost:5000/api/v1'
+        : '/api/v1';
+      const baseURL = import.meta.env.VITE_API_BASE_URL || defaultBaseUrl;
       const token = localStorage.getItem('erp_token');
 
       // Fetch blob with auth
