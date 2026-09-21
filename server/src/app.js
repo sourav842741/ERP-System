@@ -12,9 +12,22 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Security and standard middlewares
+// Security and standard middlewares with full support for Cloudinary, external images, and PhotoRoom
 app.use(helmet({
-  crossOriginResourcePolicy: false // Allows serving local media
+  crossOriginResourcePolicy: false,
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+      mediaSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", "ws:", "wss:", "https:", "http:"],
+      frameSrc: ["'self'", "https://www.photoroom.com"],
+      fontSrc: ["'self'", "https:", "data:"]
+    }
+  }
 }));
 
 const allowedOrigins = [
