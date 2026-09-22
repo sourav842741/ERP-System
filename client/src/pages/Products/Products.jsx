@@ -57,9 +57,15 @@ export const Products = () => {
     variants: []
   });
 
-  // Category Form State
+  // Category CRUD State
+  const [editingCategory, setEditingCategory] = useState(null);
   const [categoryName, setCategoryName] = useState('');
   const [categoryDesc, setCategoryDesc] = useState('');
+  const [categoryStatus, setCategoryStatus] = useState('active');
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
+  const [deletingCategory, setDeletingCategory] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -269,18 +275,82 @@ export const Products = () => {
     }
   };
 
+  const handleOpenAddCategory = () => {
+    setEditingCategory(null);
+    setCategoryName('');
+    setCategoryDesc('');
+    setCategoryStatus('active');
+    setShowCategoryModal(true);
+  };
+
+  const handleOpenEditCategory = (cat, e) => {
+    e?.stopPropagation();
+    setEditingCategory(cat);
+    setCategoryName(cat.name || '');
+    setCategoryDesc(cat.description || '');
+    setCategoryStatus(cat.status || 'active');
+    setShowCategoryModal(true);
+  };
+
   const handleSaveCategory = async (e) => {
     e.preventDefault();
+    if (!categoryName.trim()) {
+      alert('Please enter a category name');
+      return;
+    }
+    setSavingCategory(true);
     try {
-      await api.post('/products/categories', { name: categoryName, description: categoryDesc });
+      if (editingCategory) {
+        await api.put(`/products/categories/${editingCategory._id}`, {
+          name: categoryName.trim(),
+          description: categoryDesc.trim(),
+          status: categoryStatus
+        });
+      } else {
+        await api.post('/products/categories', {
+          name: categoryName.trim(),
+          description: categoryDesc.trim(),
+          status: categoryStatus
+        });
+      }
       setShowCategoryModal(false);
+      setEditingCategory(null);
       setCategoryName('');
       setCategoryDesc('');
-      fetchCategories();
+      setCategoryStatus('active');
+      await fetchCategories();
+      fetchProducts();
     } catch (err) {
       alert(err.response?.data?.message || err.message);
+    } finally {
+      setSavingCategory(false);
     }
   };
+
+  const handleDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    setDeletingCategory(true);
+    try {
+      await api.delete(`/products/categories/${categoryToDelete._id}`);
+      setCategoryToDelete(null);
+      await fetchCategories();
+      fetchProducts();
+    } catch (err) {
+      alert(err.response?.data?.message || err.message);
+    } finally {
+      setDeletingCategory(false);
+    }
+  };
+
+  const filteredCategories = categories.filter((c) => {
+    if (!categorySearch.trim()) return true;
+    const q = categorySearch.toLowerCase();
+    return (
+      c.name?.toLowerCase().includes(q) ||
+      c.description?.toLowerCase().includes(q) ||
+      c.status?.toLowerCase().includes(q)
+    );
+  });
 
   const columns = [
     {
@@ -471,7 +541,7 @@ export const Products = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setShowCategoryModal(true)} variant="outline" size="sm">
+          <Button onClick={handleOpenAddCategory} variant="outline" size="sm">
             <Layers className="w-3.5 h-3.5 mr-1" /> New Category
           </Button>
           <Button onClick={handleOpenAdd} size="sm">
@@ -528,19 +598,115 @@ export const Products = () => {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {categories.map((cat) => (
-            <div key={cat._id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs flex items-center justify-between">
-              <div>
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white">{cat.name}</h4>
-                <p className="text-xs text-slate-400 mt-0.5">{cat.description || 'No description provided'}</p>
-                <span className="text-[11px] font-semibold text-primary-600 mt-2 block">
-                  {cat.productCount || 0} associated products
-                </span>
-              </div>
-              <Badge variant="neutral" size="sm">{cat.status}</Badge>
+        <div className="space-y-4">
+          {/* Category Search & Counter Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/60 border border-slate-800 p-3.5 rounded-xl">
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={categorySearch}
+                onChange={(e) => setCategorySearch(e.target.value)}
+                placeholder="Search categories by name, desc..."
+                className="w-full pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-primary-500"
+              />
             </div>
-          ))}
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-400">
+                Total Categories: <strong className="text-white">{filteredCategories.length}</strong>
+              </span>
+              <Button onClick={handleOpenAddCategory} size="sm" variant="outline">
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add Category
+              </Button>
+            </div>
+          </div>
+
+          {/* Category Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {filteredCategories.map((cat) => (
+              <div
+                key={cat._id}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs hover:border-slate-700 transition-all flex flex-col justify-between group"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-primary-400 transition-colors">
+                      {cat.name}
+                    </h4>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge variant={cat.status === 'active' ? 'success' : 'neutral'} size="sm">
+                        {cat.status}
+                      </Badge>
+                      <button
+                        onClick={(e) => handleOpenEditCategory(cat, e)}
+                        className="p-1 text-slate-400 hover:text-blue-400 hover:bg-slate-800 rounded-md transition-colors"
+                        title="Edit Category"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCategoryToDelete(cat);
+                        }}
+                        className="p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-md transition-colors"
+                        title="Delete Category"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-400 line-clamp-2 min-h-[32px]">
+                    {cat.description || 'No description provided'}
+                  </p>
+                </div>
+
+                <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                  <button
+                    onClick={() => {
+                      setSelectedCategory(cat._id);
+                      setActiveTab('products');
+                    }}
+                    className="font-semibold text-primary-500 hover:text-primary-400 transition-colors flex items-center gap-1"
+                    title="Filter products by this category"
+                  >
+                    <span>{cat.productCount || 0} associated products</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => handleOpenEditCategory(cat, e)}
+                      className="px-2 py-1 rounded-md text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors flex items-center gap-1"
+                    >
+                      <Edit className="w-3 h-3" /> Edit
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCategoryToDelete(cat);
+                      }}
+                      className="px-2 py-1 rounded-md text-[11px] font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" /> Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {filteredCategories.length === 0 && (
+            <div className="text-center py-12 bg-slate-900/40 border border-slate-800 rounded-xl">
+              <Layers className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-slate-300">No categories found</p>
+              <p className="text-xs text-slate-500 mt-1">Try another search or create a new category.</p>
+              <Button onClick={handleOpenAddCategory} size="sm" className="mt-4">
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add Category
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -893,11 +1059,14 @@ export const Products = () => {
         </form>
       </Modal>
 
-      {/* Category Creation Modal */}
+      {/* Category Creation / Edit Modal */}
       <Modal
         isOpen={showCategoryModal}
-        onClose={() => setShowCategoryModal(false)}
-        title="Create Category"
+        onClose={() => {
+          setShowCategoryModal(false);
+          setEditingCategory(null);
+        }}
+        title={editingCategory ? `Edit Category: ${editingCategory.name}` : 'Create New Category'}
       >
         <form onSubmit={handleSaveCategory} className="space-y-4">
           <Input
@@ -911,13 +1080,84 @@ export const Products = () => {
             label="Description"
             value={categoryDesc}
             onChange={(e) => setCategoryDesc(e.target.value)}
-            placeholder="Casual, formal, sports footwear"
+            placeholder="Casual, formal, sports footwear and sneakers"
           />
-          <div className="flex justify-end gap-2 pt-3">
-            <Button variant="outline" onClick={() => setShowCategoryModal(false)}>Cancel</Button>
-            <Button type="submit">Create Category</Button>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Status
+            </label>
+            <select
+              value={categoryStatus}
+              onChange={(e) => setCategoryStatus(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:border-primary-500"
+            >
+              <option value="active">Active (Visible in Catalog)</option>
+              <option value="inactive">Inactive (Hidden)</option>
+            </select>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowCategoryModal(false);
+                setEditingCategory(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" loading={savingCategory}>
+              {editingCategory ? 'Save Changes' : 'Create Category'}
+            </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Category Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(categoryToDelete)}
+        onClose={() => setCategoryToDelete(null)}
+        title="Delete Category Confirmation"
+      >
+        {categoryToDelete && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-400">
+              <AlertTriangle className="w-5 h-5 shrink-0 text-rose-500 mt-0.5" />
+              <div>
+                <p className="font-bold text-rose-300 text-sm">
+                  Delete "{categoryToDelete.name}"?
+                </p>
+                <p className="mt-1 leading-relaxed text-slate-300">
+                  Are you sure you want to delete this category? This action will remove the category classification.
+                </p>
+                {categoryToDelete.productCount > 0 && (
+                  <p className="mt-2 text-amber-400 font-semibold bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                    ⚠️ Note: There are currently {categoryToDelete.productCount} product(s) assigned to this category.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCategoryToDelete(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="bg-rose-600 hover:bg-rose-700 text-white font-medium"
+                loading={deletingCategory}
+                onClick={handleDeleteCategory}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete Category
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
       {/* Photo Gallery Lightbox Modal */}
       <Modal

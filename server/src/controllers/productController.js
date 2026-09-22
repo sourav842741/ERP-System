@@ -84,6 +84,16 @@ export const updateCategory = async (req, res) => {
     if (status) category.status = status;
 
     await category.save();
+
+    await logAudit({
+      req,
+      action: 'CATEGORY_UPDATED',
+      module: 'Products',
+      entityId: id,
+      newValue: { name, description, status },
+      reason: 'Category updated'
+    });
+
     res.json({ success: true, message: 'Category updated successfully', data: { category } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -98,6 +108,15 @@ export const deleteCategory = async (req, res) => {
 
     category.isDeleted = true;
     await category.save();
+
+    await logAudit({
+      req,
+      action: 'CATEGORY_DELETED',
+      module: 'Products',
+      entityId: id,
+      reason: 'Category deleted'
+    });
+
     res.json({ success: true, message: 'Category deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
