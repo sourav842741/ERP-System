@@ -6,7 +6,8 @@ import {
   Crop, UploadCloud, Download, Copy, ExternalLink,
   RotateCw, RotateCcw, FlipHorizontal, FlipVertical, RefreshCw,
   Sliders, Image as ImageIcon, CheckCheck, FolderOpen,
-  Scissors, PenTool, MousePointer, Undo2, Trash2, Check
+  Scissors, PenTool, MousePointer, Undo2, Trash2, Check,
+  Search, X, Cloud
 } from 'lucide-react';
 import api from '../../api/client';
 import { Button } from '../../components/ui/Button';
@@ -70,6 +71,7 @@ export const ImageStudio = () => {
   // --- PHOTOROOM STATE ---
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [iframeKey, setIframeKey] = useState(1);
+  const [clipboardCopied, setClipboardCopied] = useState(false);
 
   // --- CLOUD MEDIA SAVE MODAL ---
   const [showCloudModal, setShowCloudModal] = useState(false);
@@ -82,13 +84,52 @@ export const ImageStudio = () => {
   const [savedCloudUrl, setSavedCloudUrl] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // --- ASSET PICKER MODAL ---
+  // --- ASSET PICKER & CLOUDINARY SEARCH ---
   const [showAssetPicker, setShowAssetPicker] = useState(false);
   const [existingAssets, setExistingAssets] = useState([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
+  const [showAssetDropdown, setShowAssetDropdown] = useState(false);
+  const [searchAssetQuery, setSearchAssetQuery] = useState('');
+  const assetDropdownRef = useRef(null);
 
   const fileInputRef = useRef(null);
   const cloudDropInputRef = useRef(null);
+
+  // Fetch Cloudinary Assets with search query
+  const fetchCloudAssets = async (search = '') => {
+    setLoadingAssets(true);
+    try {
+      const res = await api.get(`/media?limit=50&search=${encodeURIComponent(search)}`);
+      if (res.data?.success) {
+        setExistingAssets(res.data.data.assets || []);
+      }
+    } catch (err) {
+      console.error('Error fetching cloud assets:', err);
+    } finally {
+      setLoadingAssets(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCloudAssets();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (assetDropdownRef.current && !assetDropdownRef.current.contains(e.target)) {
+        setShowAssetDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearchAssetChange = (e) => {
+    const val = e.target.value;
+    setSearchAssetQuery(val);
+    fetchCloudAssets(val);
+    setShowAssetDropdown(true);
+  };
 
   // Load initial image
   useEffect(() => {
@@ -233,12 +274,19 @@ export const ImageStudio = () => {
 
   // Download Cropped
   const handleDownloadCropped = (format = 'png') => {
-    const canvas = generateCroppedCanvas();
-    if (!canvas) return;
-    const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
+    let url = croppedResultUrl;
+    if (!url) {
+      const canvas = generateCroppedCanvas();
+      if (canvas) {
+        url = canvas.toDataURL(format === 'jpg' ? 'image/jpeg' : 'image/png', 0.95);
+      } else {
+        url = imageSrc;
+      }
+    }
+    if (!url) return;
     const link = document.createElement('a');
-    link.download = `${imageTitle || 'cropped-asset'}.${format}`;
-    link.href = canvas.toDataURL(mime, 0.95);
+    link.download = `${imageTitle || 'studio-asset'}.${format}`;
+    link.href = url;
     link.click();
   };
 
@@ -252,6 +300,53 @@ export const ImageStudio = () => {
     setCloudPreview(canvas.toDataURL('image/png'));
     setSavedCloudUrl('');
     setShowCloudModal(true);
+  };
+
+  // Helper to get active cropped or base image
+  const getActiveStudioPhoto = () => {
+    if (croppedResultUrl) return croppedResultUrl;
+    const canvas = generateCroppedCanvas();
+    if (canvas) return canvas.toDataURL('image/png');
+    return imageSrc;
+  };
+
+  // Copy photo to clipboard for instant Ctrl+V inside PhotoRoom
+  const copyPhotoToClipboard = async (customPhoto) => {
+    const photoToUse = customPhoto || getActiveStudioPhoto();
+    if (!photoToUse) return false;
+    try {
+      const res = await fetch(photoToUse);
+      const blob = await res.blob();
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        setClipboardCopied(true);
+        setTimeout(() => setClipboardCopied(false), 5000);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Clipboard write error:', err);
+    }
+    return false;
+  };
+
+  // Open PhotoRoom tab with auto clipboard copy
+  const handleOpenPhotoRoomWithCropped = async () => {
+    await copyPhotoToClipboard();
+    setActiveStudioTab('photoroom');
+  };
+
+  // Open Native Freeform Cutout with cropped image loaded
+  const handleOpenCutoutWithCropped = () => {
+    const photoToUse = getActiveStudioPhoto();
+    if (photoToUse) {
+      setImageSrc(photoToUse);
+      setCroppedResultUrl('');
+      setCutoutResultUrl('');
+      setLassoPoints([]);
+    }
+    setActiveStudioTab('lasso');
   };
 
   // --- LASSO CUTOUT CANVAS LOGIC ---
@@ -438,6 +533,7 @@ export const ImageStudio = () => {
 
       if (res.data.success) {
         setSavedCloudUrl(res.data.data.asset.url);
+        fetchCloudAssets();
       }
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to upload to Cloudinary.');
@@ -523,7 +619,7 @@ export const ImageStudio = () => {
               <Scissors className="w-3.5 h-3.5 text-sky-400" /> Freeform Cutout
             </button>
             <button
-              onClick={() => setActiveStudioTab('photoroom')}
+              onClick={handleOpenPhotoRoomWithCropped}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 activeStudioTab === 'photoroom'
                   ? 'bg-slate-800 text-white shadow-xs'
@@ -534,18 +630,152 @@ export const ImageStudio = () => {
             </button>
           </div>
 
-          <Button
-            size="sm"
-            onClick={() => {
-              setCloudFile(null);
-              setCloudPreview('');
-              setSavedCloudUrl('');
-              setShowCloudModal(true);
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium"
-          >
-            <UploadCloud className="w-3.5 h-3.5 mr-1.5" /> Save to Cloud Media
-          </Button>
+          {/* CLOUDINARY LIVE SEARCH & ASSET PICKER */}
+          <div className="relative" ref={assetDropdownRef}>
+            <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 focus-within:border-blue-500 rounded-lg p-1 transition-all shadow-xs">
+              <div className="flex items-center gap-1.5 pl-2">
+                <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  value={searchAssetQuery}
+                  onChange={handleSearchAssetChange}
+                  onFocus={() => setShowAssetDropdown(true)}
+                  placeholder="Search Cloudinary images..."
+                  className="w-40 sm:w-56 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-hidden"
+                />
+                {searchAssetQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchAssetQuery('');
+                      fetchCloudAssets('');
+                    }}
+                    className="text-slate-400 hover:text-white p-0.5"
+                    title="Clear search"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAssetDropdown((prev) => !prev)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                  showAssetDropdown
+                    ? 'bg-blue-600/20 text-blue-400 border-blue-500/40'
+                    : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+                }`}
+                title="Browse Cloudinary Library"
+              >
+                <Cloud className="w-3.5 h-3.5 text-sky-400" />
+                <span className="font-semibold text-white">{existingAssets.length}</span>
+                <span className="hidden md:inline text-slate-400">Photos</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCloudFile(null);
+                  setCloudPreview('');
+                  setSavedCloudUrl('');
+                  setShowCloudModal(true);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors shrink-0"
+                title="Save current cutout / upload new image to Cloudinary"
+              >
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Save</span>
+              </button>
+            </div>
+
+            {/* DROPDOWN FLYOUT ASSET GALLERY */}
+            {showAssetDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+                  <div className="flex items-center gap-2">
+                    <Cloud className="w-4 h-4 text-sky-400" />
+                    <div>
+                      <h4 className="text-xs font-semibold text-white">Cloudinary Images</h4>
+                      <p className="text-[10px] text-slate-400">
+                        {loadingAssets ? 'Searching...' : `${existingAssets.length} image(s) available`}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-sky-400 font-medium">Click to edit</span>
+                </div>
+
+                <div className="p-3 max-h-72 overflow-y-auto space-y-2">
+                  {loadingAssets ? (
+                    <div className="py-8 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
+                      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      <span>Loading Cloudinary images...</span>
+                    </div>
+                  ) : existingAssets.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400">
+                      {searchAssetQuery ? (
+                        <>
+                          <p className="text-slate-300 font-medium">No images found for "{searchAssetQuery}"</p>
+                          <p className="text-[11px] text-slate-500 mt-1">Try another search keyword or tag.</p>
+                        </>
+                      ) : (
+                        <p>No images uploaded to Cloudinary yet.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {existingAssets.map((asset) => (
+                        <div
+                          key={asset._id}
+                          onClick={() => {
+                            loadImage(asset.url, asset.title);
+                            setShowAssetDropdown(false);
+                          }}
+                          className="group relative rounded-lg border border-slate-800 bg-slate-950 p-2 hover:border-blue-500/70 hover:bg-slate-900 cursor-pointer transition-all flex flex-col gap-1.5 shadow-xs"
+                        >
+                          <div className="aspect-square w-full rounded-md bg-slate-900 border border-slate-800/80 overflow-hidden flex items-center justify-center p-1">
+                            <img
+                              src={asset.url}
+                              alt={asset.title}
+                              className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-semibold text-slate-200 truncate group-hover:text-white">
+                              {asset.title}
+                            </p>
+                            <span className="text-[9px] text-slate-400 truncate block">
+                              {asset.category || 'Products'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-2.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAssetDropdown(false);
+                      setShowCloudModal(true);
+                    }}
+                    className="text-[11px] font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                  >
+                    <UploadCloud className="w-3 h-3" /> Upload new image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAssetDropdown(false)}
+                    className="text-[11px] text-slate-400 hover:text-white"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -682,15 +912,17 @@ export const ImageStudio = () => {
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
-                    onClick={() => setActiveStudioTab('lasso')}
+                    onClick={handleOpenCutoutWithCropped}
                     className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                    title="Load cropped photo into Native Freeform Cutout"
                   >
                     <Scissors className="w-3.5 h-3.5 mr-1 text-sky-400" /> Freeform Cutout
                   </Button>
                   <Button
                     size="sm"
-                    onClick={() => setActiveStudioTab('photoroom')}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                    onClick={handleOpenPhotoRoomWithCropped}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                    title="Auto-copy photo & open PhotoRoom for instant Ctrl+V"
                   >
                     <ExternalLink className="w-3.5 h-3.5 mr-1" /> PhotoRoom AI
                   </Button>
@@ -798,21 +1030,54 @@ export const ImageStudio = () => {
               />
             </div>
 
-            {/* Sample Presets */}
+            {/* Cloud Media & Presets */}
             <div className="pt-2 border-t border-slate-800 space-y-2">
-              <label className="text-xs font-semibold text-slate-300">Sample Assets:</label>
-              <div className="grid grid-cols-3 gap-2">
-                {SAMPLE_PRESETS.map((sample) => (
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Cloud className="w-3.5 h-3.5 text-sky-400" />
+                  {existingAssets.length > 0 ? 'Cloudinary Assets:' : 'Sample Assets:'}
+                </label>
+                {existingAssets.length > 0 && (
                   <button
-                    key={sample.name}
-                    onClick={() => loadImage(sample.url, sample.name)}
-                    className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left text-[11px] font-medium text-slate-300 flex items-center gap-1.5 truncate"
+                    type="button"
+                    onClick={() => setShowAssetDropdown(true)}
+                    className="text-[10px] text-blue-400 hover:text-blue-300 hover:underline"
                   >
-                    <img src={sample.url} alt={sample.name} className="w-5 h-5 rounded-xs object-cover" />
-                    <span className="truncate">{sample.name.split(' ')[0]}</span>
+                    View All ({existingAssets.length})
                   </button>
-                ))}
+                )}
               </div>
+
+              {existingAssets.length > 0 ? (
+                <div className="grid grid-cols-3 gap-2">
+                  {existingAssets.slice(0, 6).map((asset) => (
+                    <button
+                      key={asset._id}
+                      type="button"
+                      onClick={() => loadImage(asset.url, asset.title)}
+                      className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left text-[11px] font-medium text-slate-300 flex items-center gap-1.5 truncate group transition-colors"
+                      title={`${asset.title} - Click to edit in studio`}
+                    >
+                      <img src={asset.url} alt={asset.title} className="w-5 h-5 rounded-xs object-cover shrink-0" />
+                      <span className="truncate group-hover:text-white">{asset.title}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {SAMPLE_PRESETS.map((sample) => (
+                    <button
+                      key={sample.name}
+                      type="button"
+                      onClick={() => loadImage(sample.url, sample.name)}
+                      className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left text-[11px] font-medium text-slate-300 flex items-center gap-1.5 truncate"
+                    >
+                      <img src={sample.url} alt={sample.name} className="w-5 h-5 rounded-xs object-cover shrink-0" />
+                      <span className="truncate">{sample.name.split(' ')[0]}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1027,17 +1292,79 @@ export const ImageStudio = () => {
       {/* 4. TAB 3: PHOTOROOM BACKGROUND REMOVER */}
       {activeStudioTab === 'photoroom' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-slate-900 border border-slate-800 rounded-xl">
+          {/* PHOTO AUTO-BRIDGE & PASTE ASSISTANT */}
+          <div className="p-4 bg-gradient-to-r from-blue-950/70 via-slate-900 to-indigo-950/70 border border-blue-500/40 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-3.5 w-full md:w-auto">
+              <div className="relative shrink-0">
+                <img
+                  src={getActiveStudioPhoto()}
+                  alt="Ready Image"
+                  className="w-14 h-14 object-contain rounded-lg bg-slate-950 border border-blue-500/50 p-1 shadow-md"
+                />
+                <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Image Copied to Clipboard
+                  </span>
+                  <span className="text-[11px] text-sky-300 font-mono bg-sky-950/60 px-2 py-0.5 rounded border border-sky-800/40">
+                    Press Ctrl + V below
+                  </span>
+                </div>
+                <h4 className="text-sm font-semibold text-white">
+                  PhotoRoom canvas par click karein aur bas <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-sky-300 font-mono text-xs">Ctrl + V</kbd> dabayein!
+                </h4>
+                <p className="text-[11px] text-slate-300">
+                  External website security (CORS) ki wajah se browser direct inject nahi hone deta, lekin <strong className="text-white">Ctrl + V</strong> karte hi photo turant load ho jayegi.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end shrink-0">
+              <Button
+                size="sm"
+                onClick={() => copyPhotoToClipboard()}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8 font-medium shadow-xs"
+              >
+                <Copy className="w-3.5 h-3.5 mr-1.5" />
+                {clipboardCopied ? 'Copied to Clipboard!' : 'Re-Copy (Ctrl+V)'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownloadCropped('png')}
+                className="border-slate-700 text-slate-300 hover:bg-slate-800 text-xs h-8"
+                title="Download PNG to drag directly into PhotoRoom"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5" /> Download to Drag
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenCutoutWithCropped}
+                className="border-sky-500/40 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 text-xs h-8"
+                title="Use ERP built-in cutout without external websites"
+              >
+                <Scissors className="w-3.5 h-3.5 mr-1.5" /> Native Cutout
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-slate-900 border border-slate-800 rounded-xl">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-slate-800 text-slate-200 flex items-center justify-center shrink-0 border border-slate-700">
-                <Scissors className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-lg bg-slate-800 text-slate-200 flex items-center justify-center shrink-0 border border-slate-700">
+                <Scissors className="w-4 h-4 text-sky-400" />
               </div>
               <div className="text-xs">
                 <p className="font-semibold text-white">
-                  PhotoRoom Background Removal
+                  PhotoRoom AI Engine (Live Cloud Workspace)
                 </p>
-                <p className="text-slate-400">
-                  Drop complex photos below to remove intricate backgrounds with automatic edge detection. Download the transparent PNG and upload to Cloud Media.
+                <p className="text-slate-400 text-[11px]">
+                  Background remove hone ke baad transparent PNG download karein aur neeche "Upload Cutout to Cloudinary" se direct ERP me save karein.
                 </p>
               </div>
             </div>

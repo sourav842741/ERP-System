@@ -50,7 +50,57 @@ export const updateSupplier = async (req, res) => {
     const { id } = req.params;
     const supplier = await Supplier.findByIdAndUpdate(id, req.body, { new: true });
     if (!supplier) return res.status(404).json({ success: false, message: 'Supplier not found' });
+
+    await logAudit({
+      req,
+      action: 'SUPPLIER_UPDATED',
+      module: 'Purchases',
+      entityId: supplier._id,
+      newValue: { name: supplier.name, company: supplier.company },
+      reason: 'Supplier details updated'
+    });
+
     res.json({ success: true, message: 'Supplier updated successfully', data: { supplier } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const deleteSupplier = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const supplier = await Supplier.findById(id);
+    if (!supplier || supplier.isDeleted) {
+      return res.status(404).json({ success: false, message: 'Supplier not found' });
+    }
+
+    // Check for active (non-cancelled, non-deleted) POs
+    const activePOCount = await PurchaseOrder.countDocuments({
+      supplier: id,
+      isDeleted: false,
+      status: { $in: [PURCHASE_STATUSES.ORDERED, PURCHASE_STATUSES.PARTIALLY_RECEIVED] }
+    });
+
+    if (activePOCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete supplier with ${activePOCount} active purchase order(s). Please receive or cancel them first.`
+      });
+    }
+
+    supplier.isDeleted = true;
+    await supplier.save();
+
+    await logAudit({
+      req,
+      action: 'SUPPLIER_DELETED',
+      module: 'Purchases',
+      entityId: id,
+      oldValue: { name: supplier.name, company: supplier.company },
+      reason: 'Supplier removed'
+    });
+
+    res.json({ success: true, message: 'Supplier deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -238,3 +288,138 @@ export const receivePurchaseOrder = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const updatePurchaseOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { supplierId, warehouseId, items, discount = 0, shippingCost = 0, notes, paymentStatus, paidAmount, status } = req.body;
+
+    const po = await PurchaseOrder.findById(id);
+    if (!po || po.isDeleted) {
+      return res.status(404).json({ success: false, message: 'Purchase order not found' });
+    }
+
+    const oldTotal = po.total || 0;
+
+    if (supplierId && String(supplierId) !== String(po.supplier)) {
+      po.supplier = supplierId;
+    }
+
+    if (warehouseId) {
+      po.warehouse = warehouseId;
+    }
+
+    if (notes !== undefined) po.notes = notes;
+    if (paymentStatus) po.paymentStatus = paymentStatus;
+    if (paidAmount !== undefined) po.paidAmount = Number(paidAmount);
+    if (status && Object.values(PURCHASE_STATUSES).includes(status)) {
+      po.status = status;
+    }
+
+    // Only allow updating line items if the PO has NOT been partially or fully received
+    if (items && items.length > 0) {
+      if (po.status === PURCHASE_STATUSES.RECEIVED || po.status === PURCHASE_STATUSES.PARTIALLY_RECEIVED) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot modify items on a Purchase Order that has already received goods. You can only update payment status or notes.'
+        });
+      }
+
+      const calculatedItems = items.map((item) => {
+        const lineSubtotal = Number(item.quantity) * Number(item.unitCost);
+        const taxAmount = (lineSubtotal * Number(item.taxPercent || 0)) / 100;
+        return {
+          ...item,
+          subtotal: lineSubtotal + taxAmount
+        };
+      });
+
+      const subtotal = calculatedItems.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitCost)), 0);
+      const taxTotal = calculatedItems.reduce((sum, item) => sum + (item.subtotal - (Number(item.quantity) * Number(item.unitCost))), 0);
+      const total = subtotal + taxTotal - Number(discount || 0) + Number(shippingCost || 0);
+
+      po.items = calculatedItems;
+      po.subtotal = subtotal;
+      po.taxTotal = taxTotal;
+      po.discount = Number(discount || 0);
+      po.shippingCost = Number(shippingCost || 0);
+      po.total = total;
+
+      // Adjust pending balance difference for supplier
+      const totalDiff = total - oldTotal;
+      if (totalDiff !== 0) {
+        await Supplier.findByIdAndUpdate(po.supplier, {
+          $inc: { pendingAmount: totalDiff }
+        });
+      }
+    }
+
+    await po.save();
+
+    await logAudit({
+      req,
+      action: 'PURCHASE_ORDER_UPDATED',
+      module: 'Purchases',
+      entityId: po._id,
+      newValue: { poNumber: po.poNumber, total: po.total, status: po.status },
+      reason: `PO #${po.poNumber} updated`
+    });
+
+    const updatedPO = await PurchaseOrder.findById(po._id)
+      .populate('supplier', 'name company phone')
+      .populate('warehouse', 'name code')
+      .populate('createdBy', 'name');
+
+    res.json({ success: true, message: 'Purchase Order updated successfully', data: { purchaseOrder: updatedPO } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const deletePurchaseOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const po = await PurchaseOrder.findById(id);
+    if (!po || po.isDeleted) {
+      return res.status(404).json({ success: false, message: 'Purchase order not found' });
+    }
+
+    // 1. If PO had any received items, rollback physical stock in warehouse
+    const hasReceived = po.items?.some((i) => (i.receivedQuantity || 0) > 0);
+    if (hasReceived) {
+      await inventoryService.rollbackPurchaseStock(po, req.user?._id);
+    }
+
+    // 2. Adjust supplier stats (decrease totalPurchases and pending balance)
+    const unpaidBalance = Math.max(0, (po.total || 0) - (po.paidAmount || 0));
+    await Supplier.findByIdAndUpdate(po.supplier, {
+      $inc: {
+        totalPurchases: -1,
+        pendingAmount: -unpaidBalance
+      }
+    });
+
+    po.isDeleted = true;
+    po.status = PURCHASE_STATUSES.CANCELLED;
+    await po.save();
+
+    await logAudit({
+      req,
+      action: 'PURCHASE_ORDER_DELETED',
+      module: 'Purchases',
+      entityId: po._id,
+      oldValue: { poNumber: po.poNumber, total: po.total },
+      reason: `PO #${po.poNumber} deleted (Stock reversed: ${hasReceived ? 'YES' : 'NO'})`
+    });
+
+    emitSocketEvent('purchase:deleted', { poId: po._id, poNumber: po.poNumber });
+
+    res.json({
+      success: true,
+      message: `Purchase Order #${po.poNumber} deleted successfully.${hasReceived ? ' Received warehouse stock was automatically restored.' : ''}`
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

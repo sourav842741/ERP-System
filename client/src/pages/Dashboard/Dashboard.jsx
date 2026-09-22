@@ -562,7 +562,7 @@ export const Dashboard = () => {
 
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {topProducts.length === 0 ? (
-              <p className="text-xs text-slate-400 py-8 text-center">No product sales recorded yet.</p>
+              <p className="text-xs text-slate-400 py-8 text-center">No active products found in catalog.</p>
             ) : (
               topProducts.map((prod, idx) => (
                 <div key={prod._id || idx} className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl px-2 transition-colors">
@@ -691,7 +691,7 @@ export const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {lowStockProducts.length === 0 ? (
+                  {(!lowStockProducts || lowStockProducts.filter((item) => item?.productId && !item.productId?.isDeleted).length === 0) ? (
                     <tr>
                       <td colSpan={5} className="py-6 text-center text-slate-400">
                         <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
@@ -699,7 +699,9 @@ export const Dashboard = () => {
                       </td>
                     </tr>
                   ) : (
-                    lowStockProducts.map((item) => (
+                    lowStockProducts
+                      .filter((item) => item?.productId && !item.productId?.isDeleted)
+                      .map((item) => (
                       <tr key={item._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                         <td className="py-2 font-bold text-slate-900 dark:text-white flex items-center gap-2">
                           <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0 flex items-center justify-center">

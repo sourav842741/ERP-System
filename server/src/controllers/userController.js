@@ -112,12 +112,36 @@ export const updateUser = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findById(id);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const user = await User.findById(id).populate('role');
+    if (!user || user.isDeleted) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Safety 1: Cannot delete currently logged in account
+    if (String(req.user?._id) === String(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete your own active administrative account.'
+      });
+    }
+
+    // Safety 2: Cannot delete primary Super Admin if it is the only active one
+    if (user.role?.name === 'Super Admin') {
+      const superAdminRole = await Role.findOne({ name: 'Super Admin' });
+      const superAdminCount = await User.countDocuments({
+        role: superAdminRole?._id,
+        isDeleted: false
+      });
+      if (superAdminCount <= 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot delete the sole Super Administrator account of the system.'
+        });
+      }
+    }
 
     user.isDeleted = true;
     user.status = 'inactive';
     await user.save();
+
 
     await logAudit({
       req,

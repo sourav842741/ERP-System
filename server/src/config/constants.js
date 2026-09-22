@@ -78,10 +78,12 @@ export const DEFAULT_PERMISSIONS = [
   { code: 'order:read', name: 'View Orders', category: 'Orders' },
   { code: 'order:update', name: 'Update Order / Status', category: 'Orders' },
   { code: 'order:cancel', name: 'Cancel Order', category: 'Orders' },
+  { code: 'order:delete', name: 'Delete Order', category: 'Orders' },
 
   { code: 'purchase:create', name: 'Create Purchase Order', category: 'Purchases' },
   { code: 'purchase:read', name: 'View Purchases', category: 'Purchases' },
-  { code: 'purchase:update', name: 'Receive Purchases', category: 'Purchases' },
+  { code: 'purchase:update', name: 'Receive / Update Purchases', category: 'Purchases' },
+  { code: 'purchase:delete', name: 'Delete Purchases / Suppliers', category: 'Purchases' },
 
   { code: 'customer:create', name: 'Create Customer', category: 'Customers' },
   { code: 'customer:read', name: 'View Customers', category: 'Customers' },

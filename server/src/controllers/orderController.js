@@ -129,8 +129,15 @@ export const createOrder = async (req, res) => {
           state: customerData.state || '',
           postalCode: customerData.postalCode || ''
         });
+      } else {
+        customer.isDeleted = false;
+        if (customerData.name) customer.name = customerData.name;
+        if (customerData.phone) customer.phone = customerData.phone;
+        if (customerData.address) customer.address = customerData.address;
+        await customer.save();
       }
     }
+
 
     // 3. Determine order number (Custom manual input or auto-generated)
     let orderNumber = customOrderNumber ? String(customOrderNumber).trim().toUpperCase() : '';
@@ -148,8 +155,10 @@ export const createOrder = async (req, res) => {
     }
 
     // 4. Create Order instance
+    const invoiceNumber = req.body.invoiceNumber || `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-5)}`;
     const order = new Order({
       orderNumber,
+      invoiceNumber,
       source: source || 'Manual',
       customer: customer?._id || null,
       customerSnapshot: {
@@ -166,14 +175,17 @@ export const createOrder = async (req, res) => {
       tax: Number(tax),
       total,
       notes,
-      orderStatus: ORDER_STATUSES.CONFIRMED,
-      paymentStatus: 'PENDING',
+      orderStatus: req.body.orderStatus || ORDER_STATUSES.CONFIRMED,
+      paymentStatus: req.body.paymentStatus || 'PENDING',
+      paymentMethod: req.body.paymentMethod || 'COD',
+      shippingCarrier: req.body.shippingCarrier || '',
+      trackingNumber: req.body.trackingNumber || '',
       createdBy: req.user?._id,
       shippingAddress: {
-        street: customerData?.address || '',
-        city: customerData?.city || '',
-        state: customerData?.state || '',
-        postalCode: customerData?.postalCode || ''
+        street: customerData?.address || req.body.shippingAddress?.street || '',
+        city: customerData?.city || req.body.shippingAddress?.city || '',
+        state: customerData?.state || req.body.shippingAddress?.state || '',
+        postalCode: customerData?.postalCode || req.body.shippingAddress?.postalCode || ''
       }
     });
 
@@ -237,6 +249,130 @@ export const createOrder = async (req, res) => {
       code: err.code || 'SERVER_ERROR',
       message: err.message
     });
+  }
+};
+
+export const updateOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      customerData,
+      shippingAddress,
+      billingAddress,
+      shippingCarrier,
+      trackingNumber,
+      paymentStatus,
+      paymentMethod,
+      orderStatus,
+      cancellationReason,
+      notes
+    } = req.body;
+
+    const order = await Order.findById(id);
+    if (!order || order.isDeleted) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const prevStatus = order.orderStatus;
+
+    if (customerData) {
+      if (customerData.name) order.customerSnapshot.name = customerData.name;
+      if (customerData.phone !== undefined) order.customerSnapshot.phone = customerData.phone;
+      if (customerData.email !== undefined) order.customerSnapshot.email = customerData.email;
+      if (customerData.address !== undefined) order.customerSnapshot.address = customerData.address;
+    }
+
+    if (shippingAddress) {
+      order.shippingAddress = {
+        street: shippingAddress.street ?? order.shippingAddress?.street ?? '',
+        city: shippingAddress.city ?? order.shippingAddress?.city ?? '',
+        state: shippingAddress.state ?? order.shippingAddress?.state ?? '',
+        postalCode: shippingAddress.postalCode ?? order.shippingAddress?.postalCode ?? ''
+      };
+    }
+
+    if (billingAddress) {
+      order.billingAddress = {
+        street: billingAddress.street ?? order.billingAddress?.street ?? '',
+        city: billingAddress.city ?? order.billingAddress?.city ?? '',
+        state: billingAddress.state ?? order.billingAddress?.state ?? '',
+        postalCode: billingAddress.postalCode ?? order.billingAddress?.postalCode ?? ''
+      };
+    }
+
+    if (shippingCarrier !== undefined) order.shippingCarrier = shippingCarrier;
+    if (trackingNumber !== undefined) order.trackingNumber = trackingNumber;
+    if (paymentStatus) order.paymentStatus = paymentStatus;
+    if (paymentMethod) order.paymentMethod = paymentMethod;
+    if (notes !== undefined) order.notes = notes;
+
+    // Handle status transition
+    if (orderStatus && orderStatus !== prevStatus) {
+      if (orderStatus === ORDER_STATUSES.CANCELLED && prevStatus !== ORDER_STATUSES.CANCELLED) {
+        order.orderStatus = ORDER_STATUSES.CANCELLED;
+        order.cancellationReason = cancellationReason || 'Cancelled by admin';
+        await inventoryService.restoreStockForCancelledOrder(order, order.cancellationReason, req.user?._id);
+
+        createNotification({
+          title: 'Order Cancelled',
+          message: `Order #${order.orderNumber} was cancelled. Inventory restored.`,
+          type: NOTIFICATION_TYPES.ORDER_CANCELLED,
+          link: '/orders'
+        });
+        emitSocketEvent('order:cancelled', { orderNumber: order.orderNumber });
+      } else {
+        order.orderStatus = orderStatus;
+      }
+    }
+
+    await order.save();
+    emitSocketEvent('order:updated', order);
+
+    await logAudit({
+      req,
+      action: 'ORDER_UPDATED',
+      module: 'Orders',
+      entityId: id,
+      reason: `Order #${order.orderNumber} details updated`
+    });
+
+    res.json({ success: true, message: 'Order updated successfully', data: { order } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const deleteOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { restoreStock = true } = req.query;
+
+    const order = await Order.findById(id);
+    if (!order || order.isDeleted) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // If order has deducted stock and is not cancelled/returned, restore inventory back to warehouse
+    if (restoreStock && order.isStockDeducted && order.orderStatus !== ORDER_STATUSES.CANCELLED && order.orderStatus !== ORDER_STATUSES.RETURNED) {
+      await inventoryService.restoreStockForCancelledOrder(order, `Stock restored on Order #${order.orderNumber} deletion`, req.user?._id);
+    }
+
+    order.isDeleted = true;
+    await order.save();
+
+    emitSocketEvent('order:deleted', { orderId: id, orderNumber: order.orderNumber });
+
+    await logAudit({
+      req,
+      action: 'ORDER_DELETED',
+      module: 'Orders',
+      entityId: id,
+      reason: `Order #${order.orderNumber} soft deleted`
+    });
+
+    res.json({ success: true, message: `Order #${order.orderNumber} deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 

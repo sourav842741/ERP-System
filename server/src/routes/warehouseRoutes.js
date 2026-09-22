@@ -1,5 +1,12 @@
 import express from 'express';
-import { getWarehouses, createWarehouse, updateWarehouse, transferStock, getTransfers } from '../controllers/warehouseController.js';
+import {
+  getWarehouses,
+  createWarehouse,
+  updateWarehouse,
+  deleteWarehouse,
+  transferStock,
+  getTransfers
+} from '../controllers/warehouseController.js';
 import { authenticate } from '../middlewares/authMiddleware.js';
 import { requirePermission } from '../middlewares/rbacMiddleware.js';
 
@@ -10,7 +17,9 @@ router.use(authenticate);
 router.get('/', requirePermission('inventory:view'), getWarehouses);
 router.post('/', requirePermission('inventory:adjust'), createWarehouse);
 router.put('/:id', requirePermission('inventory:adjust'), updateWarehouse);
+router.delete('/:id', requirePermission('inventory:adjust'), deleteWarehouse);
 router.post('/transfer', requirePermission('inventory:transfer'), transferStock);
 router.get('/transfers/list', requirePermission('inventory:view'), getTransfers);
 
 export default router;
+

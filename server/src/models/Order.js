@@ -38,6 +38,14 @@ const orderSchema = new mongoose.Schema({
     enum: ['PENDING', 'PAID', 'FAILED', 'REFUNDED'],
     default: 'PENDING'
   },
+  paymentMethod: {
+    type: String,
+    enum: ['COD', 'Cash', 'UPI', 'Credit/Debit Card', 'Net Banking', 'Marketplace Prepaid', 'Other'],
+    default: 'COD'
+  },
+  shippingCarrier: { type: String, default: '' },
+  trackingNumber: { type: String, default: '' },
+  invoiceNumber: { type: String, default: '' },
   orderStatus: {
     type: String,
     enum: Object.values(ORDER_STATUSES),

@@ -176,8 +176,25 @@ export const syncMarketplaces = async (req, res) => {
 export const updateMarketplaceListing = async (req, res) => {
   try {
     const { id } = req.params;
-    const listing = await MarketplaceListing.findByIdAndUpdate(id, req.body, { new: true });
+    const updates = req.body;
+
+    if (updates.productId && !updates.variantId) {
+      const defaultVariant = await ProductVariant.findOne({ productId: updates.productId });
+      if (defaultVariant) updates.variantId = defaultVariant._id;
+    }
+
+    const listing = await MarketplaceListing.findByIdAndUpdate(id, updates, { new: true });
     if (!listing) return res.status(404).json({ success: false, message: 'Listing not found' });
+
+    await logAudit({
+      req,
+      action: 'MARKETPLACE_LISTING_UPDATED',
+      module: 'Marketplaces',
+      entityId: id,
+      newValue: updates,
+      reason: `Marketplace listing #${id} updated`
+    });
+
     res.json({ success: true, message: 'Listing updated successfully', data: { listing } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -187,7 +204,17 @@ export const updateMarketplaceListing = async (req, res) => {
 export const deleteMarketplaceListing = async (req, res) => {
   try {
     const { id } = req.params;
-    await MarketplaceListing.findByIdAndDelete(id);
+    const listing = await MarketplaceListing.findByIdAndDelete(id);
+    if (!listing) return res.status(404).json({ success: false, message: 'Listing not found' });
+
+    await logAudit({
+      req,
+      action: 'MARKETPLACE_LISTING_DELETED',
+      module: 'Marketplaces',
+      entityId: id,
+      reason: `Marketplace listing for ${listing.marketplace} (${listing.marketplaceSKU}) deleted`
+    });
+
     res.json({ success: true, message: 'Listing deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

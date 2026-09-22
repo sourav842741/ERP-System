@@ -1,7 +1,7 @@
 import express from 'express';
 import {
   getProducts, getProductById, createProduct, updateProduct, deleteProduct, bulkUpdateProducts,
-  getCategories, createCategory, updateCategory, deleteCategory
+  bulkUploadProducts, getCategories, createCategory, updateCategory, deleteCategory
 } from '../controllers/productController.js';
 import { authenticate } from '../middlewares/authMiddleware.js';
 import { requirePermission } from '../middlewares/rbacMiddleware.js';
@@ -20,6 +20,7 @@ router.delete('/categories/:id', requirePermission('product:delete'), deleteCate
 router.get('/', requirePermission('product:read'), getProducts);
 router.get('/:id', requirePermission('product:read'), getProductById);
 router.post('/', requirePermission('product:create'), createProduct);
+router.post('/bulk-upload', requirePermission('product:create'), bulkUploadProducts);
 router.put('/:id', requirePermission('product:update'), updateProduct);
 router.delete('/:id', requirePermission('product:delete'), deleteProduct);
 router.post('/bulk', requirePermission('product:update'), bulkUpdateProducts);

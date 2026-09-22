@@ -251,6 +251,28 @@ class InventoryService {
   }
 
   /**
+   * Purchase Order rollback: safely reverse received stock upon PO deletion/cancellation
+   */
+  async rollbackPurchaseStock(purchaseOrder, userId = null) {
+    if (!purchaseOrder || !purchaseOrder.items) return;
+    for (const item of purchaseOrder.items) {
+      const received = Number(item.receivedQuantity || 0);
+      if (received > 0) {
+        await this.mutateStock({
+          variantId: item.variantId,
+          warehouseId: purchaseOrder.warehouse,
+          type: INVENTORY_TRANSACTION_TYPES.ADJUSTMENT,
+          quantity: -received,
+          referenceType: 'PurchaseOrderRollback',
+          referenceId: purchaseOrder.poNumber,
+          reason: `Stock reversed due to deletion/cancellation of PO #${purchaseOrder.poNumber}`,
+          userId
+        });
+      }
+    }
+  }
+
+  /**
    * Inter-warehouse transfer
    */
   async transferStock({ sourceWarehouseId, destinationWarehouseId, items, transferNumber, userId = null }) {

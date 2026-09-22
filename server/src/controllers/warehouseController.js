@@ -79,14 +79,75 @@ export const updateWarehouse = async (req, res) => {
       await Warehouse.updateMany({ _id: { $ne: id } }, { isDefault: false });
     }
 
+    if (req.body.code) {
+      req.body.code = req.body.code.toUpperCase();
+    }
+
     const warehouse = await Warehouse.findByIdAndUpdate(id, req.body, { new: true });
     if (!warehouse) return res.status(404).json({ success: false, message: 'Warehouse not found' });
+
+    await logAudit({
+      req,
+      action: 'WAREHOUSE_UPDATED',
+      module: 'Warehouses',
+      entityId: warehouse._id,
+      newValue: { name: warehouse.name, code: warehouse.code, isDefault: warehouse.isDefault },
+      reason: 'Warehouse details updated'
+    });
 
     res.json({ success: true, message: 'Warehouse updated successfully', data: { warehouse } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const deleteWarehouse = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const warehouse = await Warehouse.findById(id);
+    if (!warehouse || warehouse.isDeleted) {
+      return res.status(404).json({ success: false, message: 'Warehouse not found' });
+    }
+
+    // Safety 1: Cannot delete primary/default warehouse
+    if (warehouse.isDefault) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete the Primary/Default warehouse hub. Please designate another warehouse as default first.'
+      });
+    }
+
+    // Safety 2: Check active physical stock in this warehouse
+    const activeStockCount = await Inventory.countDocuments({
+      warehouseId: id,
+      physicalStock: { $gt: 0 }
+    });
+
+    if (activeStockCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete warehouse because it still holds physical stock across ${activeStockCount} item(s). Please transfer or adjust the inventory first.`
+      });
+    }
+
+    warehouse.isDeleted = true;
+    await warehouse.save();
+
+    await logAudit({
+      req,
+      action: 'WAREHOUSE_DELETED',
+      module: 'Warehouses',
+      entityId: id,
+      oldValue: { name: warehouse.name, code: warehouse.code },
+      reason: 'Warehouse facility deleted'
+    });
+
+    res.json({ success: true, message: `Warehouse ${warehouse.name} deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 
 export const transferStock = async (req, res) => {
   try {

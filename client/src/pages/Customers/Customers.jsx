@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Phone, Mail, MapPin, ShoppingBag, Eye, Edit, Trash2 } from 'lucide-react';
+import {
+  Users, Plus, Phone, Mail, MapPin, ShoppingBag, Eye, Edit2, Trash2,
+  Search, RefreshCw, DollarSign, TrendingUp, ShieldAlert, CheckCircle2,
+  Calendar, Package, X, ArrowUpRight
+} from 'lucide-react';
 import api from '../../api/client';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -16,6 +20,10 @@ export const Customers = () => {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [customerDetails, setCustomerDetails] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedDeleteCustomer, setSelectedDeleteCustomer] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -27,12 +35,16 @@ export const Customers = () => {
     state: '',
     postalCode: ''
   });
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState('');
 
   const fetchCustomers = async () => {
     setLoading(true);
     try {
       const res = await api.get(`/customers?search=${encodeURIComponent(search)}`);
-      if (res.data.success) setCustomers(res.data.data.customers);
+      if (res.data.success) {
+        setCustomers(res.data.data.customers || []);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -44,6 +56,13 @@ export const Customers = () => {
     fetchCustomers();
   }, [search]);
 
+  // ================= KPI CALCULATIONS =================
+  const totalCustomers = customers.length;
+  const totalLifetimeSpend = customers.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
+  const avgCustomerLTV = totalCustomers > 0 ? Math.round(totalLifetimeSpend / totalCustomers) : 0;
+  const repeatBuyersCount = customers.filter((c) => (c.totalOrders || 0) > 1).length;
+
+  // ================= MODAL HANDLERS =================
   const handleOpenAdd = () => {
     setEditingCustomer(null);
     setFormData({
@@ -55,6 +74,7 @@ export const Customers = () => {
       state: '',
       postalCode: ''
     });
+    setFormError('');
     setShowFormModal(true);
   };
 
@@ -69,11 +89,24 @@ export const Customers = () => {
       state: cust.state || '',
       postalCode: cust.postalCode || ''
     });
+    setFormError('');
     setShowFormModal(true);
+  };
+
+  const handleOpenDelete = (cust) => {
+    setSelectedDeleteCustomer(cust);
+    setShowDeleteModal(true);
   };
 
   const handleSaveCustomer = async (e) => {
     e.preventDefault();
+    if (!formData.name.trim()) {
+      setFormError('Customer full name is required.');
+      return;
+    }
+
+    setFormLoading(true);
+    setFormError('');
     try {
       if (editingCustomer) {
         await api.put(`/customers/${editingCustomer._id}`, formData);
@@ -83,70 +116,99 @@ export const Customers = () => {
       setShowFormModal(false);
       fetchCustomers();
     } catch (err) {
-      alert(err.response?.data?.message || err.message);
+      setFormError(err.response?.data?.message || err.message);
+    } finally {
+      setFormLoading(false);
     }
   };
 
-  const handleDeleteCustomer = async (cust) => {
-    if (!window.confirm(`Are you sure you want to delete customer "${cust.name}"?`)) return;
+  const handleConfirmDelete = async () => {
+    if (!selectedDeleteCustomer) return;
+    setDeleteLoading(true);
     try {
-      await api.delete(`/customers/${cust._id}`);
+      await api.delete(`/customers/${selectedDeleteCustomer._id}`);
+      setShowDeleteModal(false);
       fetchCustomers();
     } catch (err) {
       alert(err.response?.data?.message || err.message);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
   const handleViewCustomer = async (cust) => {
+    setDetailLoading(true);
+    setShowDetailModal(true);
     try {
       const res = await api.get(`/customers/${cust._id}`);
       if (res.data.success) {
         setCustomerDetails(res.data.data);
-        setShowDetailModal(true);
       }
     } catch (err) {
       alert(err.message);
+    } finally {
+      setDetailLoading(false);
     }
   };
 
   const columns = [
     {
-      header: 'Customer',
+      header: 'Customer Details',
       render: (row) => (
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-indigo-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs uppercase">
+          <div className="w-9 h-9 rounded-xl bg-primary-50 dark:bg-primary-950/60 border border-primary-200 dark:border-primary-900/40 text-primary-600 dark:text-primary-400 font-black text-xs flex items-center justify-center shrink-0 uppercase">
             {row.name ? row.name.slice(0, 2) : 'CU'}
           </div>
           <div>
-            <p className="font-bold text-slate-900 dark:text-white leading-tight">{row.name}</p>
-            <span className="text-xs text-slate-400">{row.email || 'No email provided'}</span>
+            <p className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
+              {row.name}
+            </p>
+            <span className="text-[11px] text-slate-400 block mt-0.5">
+              {row.email || 'No email provided'}
+            </span>
           </div>
         </div>
       )
     },
     {
-      header: 'Phone',
+      header: 'Contact Phone',
       render: (row) => (
-        <span className="font-mono text-xs text-slate-700 dark:text-slate-300 font-semibold">
-          {row.phone || 'N/A'}
-        </span>
+        row.phone ? (
+          <a href={`tel:${row.phone}`} className="font-mono text-xs text-slate-700 dark:text-slate-300 font-semibold hover:text-primary-600">
+            {row.phone}
+          </a>
+        ) : (
+          <span className="text-xs text-slate-400">N/A</span>
+        )
       )
     },
     {
       header: 'Location',
       render: (row) => (
-        <span className="text-xs text-slate-600 dark:text-slate-300">
-          {row.city ? `${row.city}${row.state ? `, ${row.state}` : ''}` : (row.address || 'N/A')}
-        </span>
+        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <span>
+            {row.city ? `${row.city}${row.state ? `, ${row.state}` : ''}` : (row.address || 'India')}
+          </span>
+        </div>
       )
     },
     {
       header: 'Total Orders',
-      render: (row) => <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{row.totalOrders || 0}</span>
+      render: (row) => (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono">
+          <ShoppingBag className="w-3 h-3 text-slate-400" />
+          {row.totalOrders || 0} order{row.totalOrders !== 1 ? 's' : ''}
+        </span>
+      )
     },
     {
-      header: 'Total Spent',
-      render: (row) => <span className="font-extrabold text-primary-600 dark:text-primary-400">₹{(row.totalSpent || 0).toLocaleString()}</span>
+      header: 'Lifetime Spend (LTV)',
+      render: (row) => (
+        <span className="font-extrabold text-xs text-emerald-600 dark:text-emerald-400 font-mono">
+          ₹{(row.totalSpent || 0).toLocaleString('en-IN')}
+        </span>
+      )
     },
     {
       header: 'Actions',
@@ -154,22 +216,30 @@ export const Customers = () => {
       cellClassName: 'text-right',
       render: (row) => (
         <div className="flex items-center justify-end gap-1.5">
-          <Button size="sm" variant="outline" onClick={() => handleViewCustomer(row)} title="View Customer Profile & Orders">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleViewCustomer(row)}
+            className="text-xs h-7 px-2.5"
+            title="View Customer Profile & Past Orders"
+          >
             <Eye className="w-3.5 h-3.5 mr-1" /> Profile
           </Button>
+
           <button
             onClick={() => handleOpenEdit(row)}
             title="Edit Customer"
-            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors"
           >
-            <Edit className="w-4 h-4" />
+            <Edit2 className="w-3.5 h-3.5" />
           </button>
+
           <button
-            onClick={() => handleDeleteCustomer(row)}
+            onClick={() => handleOpenDelete(row)}
             title="Delete Customer"
-            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       )
@@ -178,34 +248,122 @@ export const Customers = () => {
 
   return (
     <div className="space-y-6">
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">Customer Intelligence</h2>
+          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+            <Users className="w-6 h-6 text-primary-500" />
+            Customer Intelligence & Lifetime Value
+          </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Customer directory, order histories, average order value, and lifetime value.
+            Automated customer profiling, repeat buyer analytics, order histories, and CRM data.
           </p>
         </div>
-        <Button onClick={handleOpenAdd} size="sm">
-          <Plus className="w-3.5 h-3.5 mr-1" /> Add Customer
-        </Button>
+
+        <div className="flex items-center gap-2.5">
+          <Button
+            onClick={handleOpenAdd}
+            size="sm"
+            className="shadow-xs bg-primary-600 hover:bg-primary-700 text-white font-bold"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            Add Customer
+          </Button>
+        </div>
       </div>
 
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+        <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-400">Total Clients</span>
+            <Users className="w-4 h-4 text-primary-500" />
+          </div>
+          <p className="text-lg font-black text-slate-900 dark:text-white mt-1">
+            {totalCustomers} Customers
+          </p>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Automated CRM directory</span>
+        </div>
+
+        <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-400">Cumulative Revenue</span>
+            <DollarSign className="w-4 h-4 text-emerald-500" />
+          </div>
+          <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-1">
+            ₹{totalLifetimeSpend.toLocaleString('en-IN')}
+          </p>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Total customer lifetime value</span>
+        </div>
+
+        <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-400">Average Customer LTV</span>
+            <TrendingUp className="w-4 h-4 text-blue-500" />
+          </div>
+          <p className="text-lg font-black text-blue-600 dark:text-blue-400 mt-1">
+            ₹{avgCustomerLTV.toLocaleString('en-IN')}
+          </p>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Revenue per unique customer</span>
+        </div>
+
+        <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-400">Repeat Buyers</span>
+            <CheckCircle2 className="w-4 h-4 text-purple-500" />
+          </div>
+          <p className="text-lg font-black text-purple-600 dark:text-purple-400 mt-1">
+            {repeatBuyersCount} Loyal Buyers
+          </p>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Ordered more than once</span>
+        </div>
+      </div>
+
+      {/* Search & Actions Bar */}
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search customer by name, phone, email, city..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 w-full focus:outline-hidden focus:ring-1 focus:ring-primary-500"
+          />
+        </div>
+
+        <button
+          onClick={fetchCustomers}
+          title="Refresh Customer Directory"
+          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Main Customers Table */}
       <DataTable
         columns={columns}
         data={customers}
         loading={loading}
-        searchValue={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search customer by name, phone, email..."
+        emptyMessage="No customers recorded yet. Customers are automatically saved when orders are placed, or you can click '+ Add Customer' to register one."
       />
 
-      {/* Add / Edit Customer Modal */}
+      {/* ============================================================== */}
+      {/* MODAL 1: ADD / EDIT CUSTOMER */}
+      {/* ============================================================== */}
       <Modal
         isOpen={showFormModal}
         onClose={() => setShowFormModal(false)}
-        title={editingCustomer ? 'Edit Customer Details' : 'Add New Customer'}
+        title={editingCustomer ? `Edit Customer: ${editingCustomer.name}` : 'Register New Customer'}
       >
         <form onSubmit={handleSaveCustomer} className="space-y-4">
+          {formError && (
+            <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-lg text-xs text-rose-600">
+              {formError}
+            </div>
+          )}
+
           <Input
             label="Customer Full Name *"
             required
@@ -234,7 +392,7 @@ export const Customers = () => {
             label="Street Address"
             value={formData.address}
             onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-            placeholder="Apartment, Lane, Area"
+            placeholder="Flat 4B, Silver Oak, GT Road"
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -242,117 +400,180 @@ export const Customers = () => {
               label="City"
               value={formData.city}
               onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-              placeholder="e.g. Kolkata"
+              placeholder="Kolkata"
             />
             <Input
               label="State"
               value={formData.state}
               onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-              placeholder="e.g. West Bengal"
+              placeholder="West Bengal"
             />
             <Input
-              label="Postal Code / PIN"
+              label="Postal / PIN Code"
               value={formData.postalCode}
               onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
-              placeholder="e.g. 700001"
+              placeholder="700001"
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <Button variant="outline" onClick={() => setShowFormModal(false)}>Cancel</Button>
-            <Button type="submit">
-              {editingCustomer ? 'Update Customer' : 'Save Customer'}
+            <Button variant="outline" type="button" onClick={() => setShowFormModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={formLoading} className="font-bold">
+              {formLoading ? 'Saving...' : (editingCustomer ? 'Update Customer' : 'Save Customer')}
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* View Customer Details Modal */}
+      {/* ============================================================== */}
+      {/* MODAL 2: VIEW CUSTOMER PROFILE & ORDER HISTORY */}
+      {/* ============================================================== */}
       <Modal
         isOpen={showDetailModal}
         onClose={() => setShowDetailModal(false)}
-        title={customerDetails?.customer?.name ? `${customerDetails.customer.name} - Profile & Analytics` : 'Customer Profile'}
-        maxWidth="max-w-2xl"
+        title="Customer Profile & Intelligence"
+        maxWidth="max-w-3xl"
       >
-        <div className="space-y-5">
-          {/* Customer header info */}
-          {customerDetails?.customer && (
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white">{customerDetails.customer.name}</h4>
-                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
-                  {customerDetails.customer.phone && <span>📞 {customerDetails.customer.phone}</span>}
-                  {customerDetails.customer.email && <span>✉️ {customerDetails.customer.email}</span>}
-                  {customerDetails.customer.city && <span>📍 {customerDetails.customer.city}</span>}
+        {detailLoading ? (
+          <div className="py-12 text-center text-xs text-slate-400">Loading customer history...</div>
+        ) : customerDetails ? (
+          <div className="space-y-4 text-xs">
+            {/* Customer Summary Card */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-indigo-600 text-white font-black text-sm flex items-center justify-center shrink-0 uppercase shadow-xs">
+                  {customerDetails.customer?.name?.slice(0, 2) || 'CU'}
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
+                    {customerDetails.customer?.name}
+                  </h3>
+                  <div className="flex items-center gap-3 text-slate-400 mt-1">
+                    {customerDetails.customer?.phone && <span>📞 {customerDetails.customer?.phone}</span>}
+                    {customerDetails.customer?.email && <span>✉️ {customerDetails.customer?.email}</span>}
+                  </div>
+                  {customerDetails.customer?.address && (
+                    <span className="text-[11px] text-slate-400 block mt-0.5">
+                      📍 {customerDetails.customer?.address}
+                    </span>
+                  )}
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setShowDetailModal(false);
-                  handleOpenEdit(customerDetails.customer);
-                }}
-              >
-                <Edit className="w-3.5 h-3.5 mr-1" /> Edit Profile
-              </Button>
-            </div>
-          )}
 
-          {/* Analytics KPI boxes */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs border border-slate-100 dark:border-slate-700">
-              <span className="text-slate-400 block font-medium">Total Orders</span>
-              <span className="text-xl font-black text-slate-900 dark:text-white mt-1 block">
-                {customerDetails?.analytics?.totalOrders || 0}
-              </span>
+              {/* Stats Tiles */}
+              <div className="flex items-center gap-3 sm:border-l sm:pl-4 border-slate-200 dark:border-slate-700">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Orders</span>
+                  <span className="font-black text-sm text-slate-900 dark:text-white">
+                    {customerDetails.analytics?.totalOrders || 0}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Lifetime Spend</span>
+                  <span className="font-black text-sm text-emerald-600 dark:text-emerald-400 font-mono">
+                    ₹{(customerDetails.analytics?.totalSpent || 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">AOV</span>
+                  <span className="font-black text-sm text-blue-600 dark:text-blue-400 font-mono">
+                    ₹{(customerDetails.analytics?.avgOrderValue || 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl text-xs border border-emerald-200 dark:border-emerald-800">
-              <span className="text-emerald-600 dark:text-emerald-400 block font-medium">Total Spent</span>
-              <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1 block">
-                ₹{(customerDetails?.analytics?.totalSpent || 0).toLocaleString()}
-              </span>
-            </div>
-            <div className="p-3 bg-primary-50 dark:bg-primary-950/40 rounded-xl text-xs border border-primary-200 dark:border-primary-800">
-              <span className="text-primary-600 dark:text-primary-400 block font-medium">Avg Order Value</span>
-              <span className="text-xl font-black text-primary-600 dark:text-primary-400 mt-1 block">
-                ₹{(customerDetails?.analytics?.avgOrderValue || 0).toLocaleString()}
-              </span>
-            </div>
-          </div>
 
-          {/* Order history */}
-          <div>
-            <h4 className="text-xs font-bold uppercase text-slate-400 mb-2.5">
-              Order History ({customerDetails?.orders?.length || 0})
-            </h4>
-            <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
-              {customerDetails?.orders?.length === 0 ? (
-                <p className="text-xs text-slate-400 py-6 text-center">No orders placed yet.</p>
+            {/* Past Orders List */}
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Order History ({customerDetails.orders?.length || 0})
+              </h4>
+              {customerDetails.orders?.length > 0 ? (
+                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 dark:bg-slate-800/60 font-bold uppercase text-[10px] text-slate-500 border-b">
+                      <tr>
+                        <th className="p-2.5">Order #</th>
+                        <th className="p-2.5">Date</th>
+                        <th className="p-2.5">Source</th>
+                        <th className="p-2.5 text-right">Total</th>
+                        <th className="p-2.5 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {customerDetails.orders.map((o) => (
+                        <tr key={o._id}>
+                          <td className="p-2.5 font-mono font-bold text-primary-600">
+                            #{o.orderNumber}
+                          </td>
+                          <td className="p-2.5 text-slate-400">
+                            {new Date(o.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="p-2.5 font-medium">{o.source}</td>
+                          <td className="p-2.5 text-right font-mono font-bold">
+                            ₹{o.total?.toLocaleString('en-IN')}
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
+                              {o.orderStatus}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
-                customerDetails?.orders?.map((o) => (
-                  <div key={o._id} className="p-3 flex justify-between items-center text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                    <div>
-                      <span className="font-bold font-mono text-slate-900 dark:text-white">#{o.orderNumber}</span>
-                      <span className="ml-2 text-slate-400">({o.source})</span>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">
-                        {new Date(o.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-extrabold text-sm">₹{o.total}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                        o.orderStatus === 'DELIVERED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300' :
-                        o.orderStatus === 'CANCELLED' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300' :
-                        'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                      }`}>
-                        {o.orderStatus}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                <div className="py-6 text-center text-xs text-slate-400 border border-dashed rounded-xl">
+                  No orders completed by this customer yet.
+                </div>
               )}
             </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+              <Button variant="outline" size="sm" onClick={() => setShowDetailModal(false)}>
+                Close Profile
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* MODAL 3: DELETE CUSTOMER CONFIRMATION */}
+      {/* ============================================================== */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete Customer Profile"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-700 dark:text-rose-300">
+            <p className="font-bold flex items-center gap-1.5">
+              <ShieldAlert className="w-4 h-4 text-rose-500" />
+              Customer Deletion Check
+            </p>
+            <p className="mt-1">
+              Are you sure you want to delete customer <strong>{selectedDeleteCustomer?.name}</strong>?
+            </p>
+            <p className="mt-1 text-slate-500">
+              Note: Historical orders linked to this customer will remain safe in your financial ledger.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              disabled={deleteLoading}
+              onClick={handleConfirmDelete}
+            >
+              {deleteLoading ? 'Deleting...' : 'Confirm Delete Customer'}
+            </Button>
           </div>
         </div>
       </Modal>

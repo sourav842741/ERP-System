@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
   Plus, Edit, Trash2, Layers, Image as ImageIcon,
   CheckCircle, XCircle, Search, Filter, Upload,
   Boxes, AlertTriangle, Eye, Sparkles, Loader2, X,
-  ChevronLeft, ChevronRight, Star
+  ChevronLeft, ChevronRight, Star, FileSpreadsheet, Download,
+  Check, CheckCheck, UploadCloud
 } from 'lucide-react';
 import api from '../../api/client';
 import { Button } from '../../components/ui/Button';
@@ -66,6 +68,20 @@ export const Products = () => {
   const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [deletingCategory, setDeletingCategory] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
+
+  // Bulk Excel Upload State
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkRows, setBulkRows] = useState([]);
+  const [bulkStats, setBulkStats] = useState({ totalRows: 0, parentCount: 0, variantCount: 0, totalStock: 0 });
+  const [bulkWarehouseId, setBulkWarehouseId] = useState('');
+  const [uploadingBulk, setUploadingBulk] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
+  const bulkFileInputRef = useRef(null);
+
+  // Variant Bulk Quick-Fill State
+  const [bulkApplyPrice, setBulkApplyPrice] = useState('');
+  const [bulkApplyStock, setBulkApplyStock] = useState('');
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -135,7 +151,21 @@ export const Products = () => {
   const handleOpenEdit = (product) => {
     setEditingProduct(product);
     setImageUrlInput('');
-    setProductType(product.variants?.length > 1 ? 'variants' : 'simple');
+    const hasMultipleVariants = product.variants && (
+      product.variants.length > 1 ||
+      product.variants.some((v) => (v.size && v.size !== 'Standard') || (v.color && v.color !== 'Default'))
+    );
+    setProductType(hasMultipleVariants ? 'variants' : 'simple');
+
+    const mappedVariants = (product.variants || []).map((v) => ({
+      _id: v._id,
+      color: v.color || '',
+      size: v.size || '',
+      price: v.price || product.sellingPrice || '',
+      sku: v.sku || '',
+      initialStock: v.stock?.availableStock !== undefined ? v.stock.availableStock : (v.stock?.physicalStock || 0)
+    }));
+
     setFormData({
       name: product.name,
       sku: product.sku,
@@ -149,7 +179,10 @@ export const Products = () => {
       description: product.description || '',
       initialStock: product.availableStock || 0,
       images: product.images || [],
-      variants: product.variants || []
+      variants: mappedVariants.length > 0 ? mappedVariants : [
+        { color: 'Black', size: 'M', price: product.sellingPrice || '', initialStock: 25, sku: '' },
+        { color: 'Black', size: 'L', price: product.sellingPrice || '', initialStock: 25, sku: '' }
+      ]
     });
     setShowProductModal(true);
   };
@@ -272,6 +305,482 @@ export const Products = () => {
       fetchProducts();
     } catch (err) {
       alert(err.message);
+    }
+  };
+
+  // --- EXCEL BULK UPLOAD HANDLERS ---
+  const handleDownloadTemplate = () => {
+    const headers = [
+      'Image URL',
+      'Product Title *',
+      'Master SKU (Parent) *',
+      'Category *',
+      'Brand / Manufacturer',
+      'HSN Code *',
+      'Variant Size',
+      'Variant Color',
+      'Variant SKU (Picker Barcode) [AUTO]',
+      'Cost Price (₹)',
+      'Selling Price (₹) *',
+      'Variant Price (₹)',
+      'MRP (₹) *',
+      'GST Tax (%) *',
+      'Stock Qty *'
+    ];
+
+    const sampleRows = [
+      [
+        'https://res.cloudinary.com/czb80riv/image/upload/v1790092926/erp_media_gallery/w4ys7f1gsafe4qje9o9i.png',
+        'Shinchan Classic Ceramic Coffee Mug',
+        'MUM-01',
+        'Home & Kitchen',
+        'Deep Enterprises',
+        '691200',
+        '',
+        '',
+        'MUM01',
+        150,
+        399,
+        399,
+        599,
+        18,
+        50
+      ],
+      [
+        'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800',
+        'Men Oversized Cotton T-Shirt',
+        'T10',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '61091000',
+        'S',
+        'Black',
+        'S-T10-BLK',
+        300,
+        699,
+        699,
+        1299,
+        5,
+        20
+      ],
+      [
+        'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800',
+        'Men Oversized Cotton T-Shirt',
+        'T10',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '61091000',
+        'M',
+        'Black',
+        'M-T10-BLK',
+        300,
+        699,
+        699,
+        1299,
+        5,
+        20
+      ],
+      [
+        'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800',
+        'Men Oversized Cotton T-Shirt',
+        'T10',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '61091000',
+        'L',
+        'Black',
+        'L-T10-BLK',
+        300,
+        699,
+        699,
+        1299,
+        5,
+        25
+      ],
+      [
+        'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800',
+        'Men Oversized Cotton T-Shirt',
+        'T10',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '61091000',
+        'XL',
+        'Black',
+        'XL-T10-BLK',
+        300,
+        699,
+        699,
+        1299,
+        5,
+        25
+      ],
+      [
+        'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=800',
+        'Men Slim Fit Cotton Shirt',
+        'SH05',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '62052000',
+        'M',
+        'Navy Blue',
+        'M-SH05-NVY',
+        400,
+        899,
+        899,
+        1499,
+        5,
+        15
+      ],
+      [
+        'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=800',
+        'Men Slim Fit Cotton Shirt',
+        'SH05',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '62052000',
+        'L',
+        'Navy Blue',
+        'L-SH05-NVY',
+        400,
+        899,
+        899,
+        1499,
+        5,
+        15
+      ],
+      [
+        'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800',
+        'Men Windproof Bomber Jacket',
+        'JK05',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '62019300',
+        'XL',
+        'Black',
+        'XL-JK05-BLK',
+        750,
+        1699,
+        1699,
+        2699,
+        12,
+        10
+      ],
+      [
+        'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800',
+        'Printed T-Shirt',
+        'T265',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '61091000',
+        'S',
+        'Black',
+        'S-T265-BLK',
+        450,
+        1099,
+        1099,
+        1899,
+        5,
+        10
+      ],
+      [
+        'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800',
+        'Printed T-Shirt',
+        'T265',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '61091000',
+        'M',
+        'Black',
+        'M-T265-BLK',
+        450,
+        1099,
+        1099,
+        1899,
+        5,
+        10
+      ],
+      [
+        'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800',
+        'Printed T-Shirt',
+        'T265',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '61091000',
+        'L',
+        'Black',
+        'L-T265-BLK',
+        450,
+        1099,
+        1099,
+        1899,
+        5,
+        10
+      ],
+      [
+        'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800',
+        'Printed T-Shirt',
+        'T265',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '61091000',
+        'XL',
+        'Black',
+        'XL-T265-BLK',
+        450,
+        1099,
+        1099,
+        1899,
+        5,
+        10
+      ],
+      [
+        'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800',
+        'Printed T-Shirt',
+        'T265',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '61091000',
+        'XXL',
+        'Black',
+        'XXL-T265-BLK',
+        450,
+        1099,
+        1099,
+        1899,
+        5,
+        10
+      ],
+      [
+        'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800',
+        'Printed T-Shirt',
+        'T265',
+        'Apparel & Fashion',
+        'Deep Enterprises',
+        '61091000',
+        '3XL',
+        'Black',
+        '3XL-T265-BLK',
+        450,
+        1099,
+        1099,
+        1899,
+        5,
+        10
+      ]
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+    ws['!cols'] = [
+      { wch: 32 }, // Image URL
+      { wch: 30 }, // Title
+      { wch: 20 }, // Master SKU
+      { wch: 18 }, // Category
+      { wch: 18 }, // Brand
+      { wch: 14 }, // HSN
+      { wch: 12 }, // Size
+      { wch: 12 }, // Color
+      { wch: 24 }, // Variant SKU
+      { wch: 14 }, // Cost
+      { wch: 16 }, // Sell
+      { wch: 16 }, // Var Price
+      { wch: 12 }, // MRP
+      { wch: 12 }, // GST
+      { wch: 12 }  // Stock
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Products_Upload');
+    XLSX.writeFile(wb, 'erp_master_inventory_upload_dynamic.xlsx');
+  };
+
+  // Export entire product catalog with all variants and sizes to Excel
+  const handleExportCatalog = () => {
+    if (!products || products.length === 0) {
+      alert('No products available to export.');
+      return;
+    }
+
+    const headers = [
+      'Image URL',
+      'Product Title *',
+      'Master SKU (Parent) *',
+      'Category *',
+      'Brand / Manufacturer',
+      'HSN Code *',
+      'Variant Size',
+      'Variant Color',
+      'Variant SKU (Picker Barcode) [AUTO]',
+      'Cost Price (₹)',
+      'Selling Price (₹) *',
+      'Variant Price (₹)',
+      'MRP (₹) *',
+      'GST Tax (%) *',
+      'Stock Qty *'
+    ];
+
+    const rows = [];
+    products.forEach((p) => {
+      const vars = p.variants || [];
+      if (vars.length > 0) {
+        vars.forEach((v) => {
+          rows.push([
+            v.images?.[0]?.url || p.images?.[0]?.url || '',
+            p.name,
+            p.sku,
+            p.category?.name || 'General',
+            p.brand || '',
+            p.hsnCode || '6203',
+            v.size || '',
+            v.color || '',
+            v.sku || '',
+            v.costPrice || p.costPrice || 0,
+            p.sellingPrice,
+            v.price || p.sellingPrice,
+            p.mrp || p.sellingPrice,
+            p.gst || 18,
+            v.stock?.availableStock !== undefined ? v.stock.availableStock : (v.stock?.physicalStock || 0)
+          ]);
+        });
+      } else {
+        rows.push([
+          p.images?.[0]?.url || '',
+          p.name,
+          p.sku,
+          p.category?.name || 'General',
+          p.brand || '',
+          p.hsnCode || '6203',
+          '',
+          '',
+          p.sku,
+          p.costPrice || 0,
+          p.sellingPrice,
+          p.sellingPrice,
+          p.mrp || p.sellingPrice,
+          p.gst || 18,
+          p.availableStock || 0
+        ]);
+      }
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = [
+      { wch: 32 }, { wch: 30 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
+      { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 24 }, { wch: 14 },
+      { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 12 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Product_Catalog_Export');
+    XLSX.writeFile(wb, `erp_product_catalog_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleBulkFileParse = (file) => {
+    if (!file) return;
+    setBulkFile(file);
+    setBulkResult(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames.includes('Products_Upload')
+          ? 'Products_Upload'
+          : workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+        if (!rawJson || rawJson.length === 0) {
+          alert('Excel sheet is empty or contains no valid rows.');
+          return;
+        }
+
+        const normalized = rawJson.map((row, idx) => {
+          const sku = (row['Master SKU (Parent) *'] || row['Master SKU (Parent)'] || row['Master SKU'] || row.sku || '').toString().trim();
+          const title = (row['Product Title *'] || row['Product Title'] || row.name || row.title || '').toString().trim();
+          const category = (row['Category *'] || row['Category'] || row.category || 'General').toString().trim();
+          const brand = (row['Brand / Manufacturer'] || row['Brand'] || row.brand || '').toString().trim();
+          const hsnCode = (row['HSN Code *'] || row['HSN Code'] || row.hsnCode || '').toString().trim();
+          const variantSize = (row['Variant Size'] || row.variantSize || '').toString().trim();
+          const variantColor = (row['Variant Color'] || row.variantColor || '').toString().trim();
+          const variantSku = (row['Variant SKU (Picker Barcode) [AUTO]'] || row['Variant SKU'] || row.variantSku || '').toString().trim();
+          const costPrice = Number(row['Cost Price (₹)'] || row.costPrice || 0);
+          const sellingPrice = Number(row['Selling Price (₹) *'] || row['Selling Price (₹)'] || row.sellingPrice || 0);
+          const variantPrice = Number(row['Variant Price (₹)'] || row.variantPrice || sellingPrice);
+          const mrp = Number(row['MRP (₹) *'] || row['MRP (₹)'] || row.mrp || sellingPrice);
+          const gst = Number(row['GST Tax (%) *'] || row['GST Tax (%)'] || row.gst || 18);
+          const stockQty = Number(row['Stock Qty *'] || row['Stock Qty'] || row.stockQty || 0);
+          const imageUrl = (row['Image URL'] || row.imageUrl || '').toString().trim();
+
+          const missingFields = [];
+          if (!sku) missingFields.push('Master SKU');
+          if (!title) missingFields.push('Product Title');
+          if (sellingPrice <= 0) missingFields.push('Selling Price');
+
+          return {
+            rowNum: idx + 2,
+            sku,
+            title,
+            category,
+            brand,
+            hsnCode,
+            variantSize,
+            variantColor,
+            variantSku: variantSku || (variantSize || variantColor ? `${sku}-${variantColor || 'V'}-${variantSize || (idx + 1)}` : sku),
+            costPrice,
+            sellingPrice,
+            variantPrice,
+            mrp,
+            gst,
+            stockQty,
+            imageUrl,
+            missingFields,
+            isValid: missingFields.length === 0
+          };
+        });
+
+        const parentSkus = new Set(normalized.map((r) => r.sku).filter(Boolean));
+        const totalStock = normalized.reduce((sum, r) => sum + (r.stockQty || 0), 0);
+        const variantsCount = normalized.filter((r) => r.variantSize || r.variantColor).length;
+
+        setBulkRows(normalized);
+        setBulkStats({
+          totalRows: normalized.length,
+          parentCount: parentSkus.size,
+          variantCount: variantsCount,
+          totalStock
+        });
+      } catch (err) {
+        alert('Failed to parse Excel file: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleConfirmBulkUpload = async () => {
+    if (!bulkRows.length) return;
+    const invalidCount = bulkRows.filter((r) => !r.isValid).length;
+    if (invalidCount > 0) {
+      if (!window.confirm(`${invalidCount} row(s) have missing required fields. Proceed anyway with valid rows?`)) {
+        return;
+      }
+    }
+
+    setUploadingBulk(true);
+    try {
+      const res = await api.post('/products/bulk-upload', {
+        rows: bulkRows.filter((r) => r.isValid),
+        warehouseId: bulkWarehouseId || warehouses[0]?._id
+      });
+
+      if (res.data.success) {
+        setBulkResult(res.data.data);
+        await fetchProducts();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || err.message);
+    } finally {
+      setUploadingBulk(false);
     }
   };
 
@@ -447,12 +956,65 @@ export const Products = () => {
       )
     },
     {
-      header: 'Variants',
-      render: (row) => (
-        <Badge variant="neutral" size="sm">
-          <Layers className="w-3 h-3 mr-1" /> {row.variants?.length || 1} {row.variants?.length === 1 ? 'variant' : 'variants'}
-        </Badge>
-      )
+      header: 'Variants & Sizes',
+      render: (row) => {
+        const variants = row.variants || [];
+        const hasSpecificVariants = variants.length > 1 || variants.some((v) => (v.size && v.size !== 'Standard') || (v.color && v.color !== 'Default'));
+
+        if (!hasSpecificVariants || variants.length === 0) {
+          return (
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <span className="inline-block w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+              <span className="text-slate-500 font-medium">Standard (Single)</span>
+            </div>
+          );
+        }
+
+        return (
+          <div className="space-y-1.5 max-w-[280px]">
+            <div className="flex items-center gap-1.5">
+              <Badge variant="neutral" size="sm" className="font-bold">
+                <Layers className="w-3 h-3 mr-1 text-primary-500" /> {variants.length} {variants.length === 1 ? 'Variant' : 'Sizes / Variants'}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {variants.slice(0, 4).map((v, i) => {
+                const stockQty = v.stock?.availableStock !== undefined ? v.stock.availableStock : (v.stock?.physicalStock || 0);
+                const isOut = stockQty <= 0;
+                return (
+                  <span
+                    key={v._id || i}
+                    title={`${v.color ? v.color + ' • ' : ''}Size: ${v.size || 'Std'} | Stock: ${stockQty} pcs | SKU: ${v.sku || 'N/A'}`}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold border transition-all ${
+                      isOut
+                        ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800'
+                        : 'bg-slate-100 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    {v.color && (
+                      <span className="text-[10px] text-slate-400 font-normal">{v.color}</span>
+                    )}
+                    <span className="font-bold text-slate-900 dark:text-slate-100">{v.size || 'Std'}</span>
+                    <span className={`text-[10px] px-1 rounded font-black ${
+                      isOut ? 'bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-200' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                    }`}>
+                      {stockQty}
+                    </span>
+                  </span>
+                );
+              })}
+              {variants.length > 4 && (
+                <span
+                  title={variants.slice(4).map((v) => `${v.color ? v.color + ' ' : ''}${v.size || 'Std'}: ${v.stock?.availableStock || 0} pcs`).join(', ')}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-800 cursor-help"
+                >
+                  +{variants.length - 4} more
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      }
     },
     {
       header: 'Pricing',
@@ -465,27 +1027,33 @@ export const Products = () => {
     },
     {
       header: 'Total Quantity / Stock',
-      render: (row) => (
-        <div>
-          <div className="flex items-center gap-1.5">
-            <span className={`text-sm font-black ${
-              row.availableStock === 0 ? 'text-rose-600' :
-              row.availableStock <= 15 ? 'text-amber-600' : 'text-emerald-600'
-            }`}>
-              {row.availableStock} Units
+      render: (row) => {
+        const minThreshold = row.minimumStock ?? 10;
+        const isOutOfStock = row.availableStock === 0;
+        const isLowStock = row.availableStock > 0 && row.availableStock <= minThreshold;
+
+        return (
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className={`text-sm font-black ${
+                isOutOfStock ? 'text-rose-600' :
+                isLowStock ? 'text-amber-600' : 'text-emerald-600'
+              }`}>
+                {row.availableStock} Units
+              </span>
+              <Badge
+                variant={isOutOfStock ? 'danger' : isLowStock ? 'warning' : 'success'}
+                size="sm"
+              >
+                {isOutOfStock ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'In Stock'}
+              </Badge>
+            </div>
+            <span className="text-[10px] text-slate-400 block mt-0.5">
+              Total Physical: {row.totalStock || row.availableStock} pcs
             </span>
-            <Badge
-              variant={row.availableStock === 0 ? 'danger' : row.availableStock <= 15 ? 'warning' : 'success'}
-              size="sm"
-            >
-              {row.availableStock === 0 ? 'Out of Stock' : row.availableStock <= 15 ? 'Low Stock' : 'In Stock'}
-            </Badge>
           </div>
-          <span className="text-[10px] text-slate-400 block mt-0.5">
-            Total Physical: {row.totalStock || row.availableStock} pcs
-          </span>
-        </div>
-      )
+        );
+      }
     },
     {
       header: 'Status',
@@ -540,11 +1108,46 @@ export const Products = () => {
             Manage product specifications, photo uploads, initial quantities, and centralized stock initialization.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            onClick={handleDownloadTemplate}
+            variant="outline"
+            size="sm"
+            className="border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            title="Download sample Excel spreadsheet template"
+          >
+            <Download className="w-3.5 h-3.5 mr-1 text-emerald-600 dark:text-emerald-400" /> Excel Template
+          </Button>
+          <Button
+            type="button"
+            onClick={handleExportCatalog}
+            variant="outline"
+            size="sm"
+            className="border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            title="Export all products, sizes, colors and stock to Excel file"
+          >
+            <Download className="w-3.5 h-3.5 mr-1 text-blue-600 dark:text-blue-400" /> Export Catalog
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              setBulkFile(null);
+              setBulkRows([]);
+              setBulkResult(null);
+              setBulkWarehouseId(warehouses[0]?._id || '');
+              setShowBulkModal(true);
+            }}
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
+            title="Bulk import products from Excel sheet"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" /> Bulk Excel Upload
+          </Button>
           <Button onClick={handleOpenAddCategory} variant="outline" size="sm">
             <Layers className="w-3.5 h-3.5 mr-1" /> New Category
           </Button>
-          <Button onClick={handleOpenAdd} size="sm">
+          <Button onClick={handleOpenAdd} size="sm" className="bg-primary-600 hover:bg-primary-700 text-white">
             <Plus className="w-3.5 h-3.5 mr-1" /> Add Product
           </Button>
         </div>
@@ -902,83 +1505,153 @@ export const Products = () => {
             />
           </div>
 
-          {/* SECTION 3: INVENTORY STOCK / QUANTITY (KITNA ADD KARNA HAI) */}
-          {!editingProduct && (
-            <div className="p-4 bg-primary-50/40 dark:bg-primary-950/20 rounded-xl border border-primary-200 dark:border-primary-800 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-primary-200/60 dark:border-primary-800/60 pb-3">
-                <div>
-                  <h4 className="text-xs font-bold uppercase text-primary-800 dark:text-primary-200 flex items-center gap-1.5">
-                    <Boxes className="w-4 h-4 text-primary-600" /> Kitna Product Add Karna Hai (Initial Stock / Quantity) *
-                  </h4>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Choose whether this is a single item or has multiple sizes/colors.
-                  </p>
-                </div>
-
-                {/* Single vs Variant Toggle */}
-                <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => setProductType('simple')}
-                    className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
-                      productType === 'simple'
-                        ? 'bg-primary-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                    }`}
-                  >
-                    Standard (Single Stock)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setProductType('variants')}
-                    className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
-                      productType === 'variants'
-                        ? 'bg-primary-600 text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                    }`}
-                  >
-                    Multi-Variant (Sizes/Colors)
-                  </button>
-                </div>
+          {/* SECTION 3: INVENTORY STOCK / QUANTITY & VARIANTS (SIZES/COLORS) */}
+          <div className="p-4 bg-primary-50/40 dark:bg-primary-950/20 rounded-xl border border-primary-200 dark:border-primary-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-primary-200/60 dark:border-primary-800/60 pb-3">
+              <div>
+                <h4 className="text-xs font-bold uppercase text-primary-800 dark:text-primary-200 flex items-center gap-1.5">
+                  <Boxes className="w-4 h-4 text-primary-600" />
+                  {editingProduct
+                    ? 'Product Stock & Variants (Sizes: S, M, L, XL / Colors)'
+                    : 'Kitna Product Add Karna Hai (Initial Stock / Quantity) *'}
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {editingProduct
+                    ? 'Edit sizes, colors, prices, and live inventory stock for this item.'
+                    : 'Choose whether this is a single item or has multiple sizes/colors.'}
+                </p>
               </div>
 
-              {productType === 'simple' ? (
-                /* SINGLE PRODUCT INITIAL QUANTITY INPUT */
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                  <div className="sm:col-span-2">
-                    <Input
-                      label="Initial Quantity / Stock Added (Pcs / Units) *"
-                      type="number"
-                      min="0"
-                      required
-                      value={formData.initialStock}
-                      onChange={(e) => setFormData({ ...formData, initialStock: e.target.value })}
-                      placeholder="e.g. 50"
-                      helperText="Total units that will immediately be credited to the Central Inventory balance."
-                    />
-                  </div>
-                  <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-primary-200 dark:border-primary-800 text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Quantity Added</span>
-                    <span className="text-xl font-black text-emerald-600">
-                      {formData.initialStock || 0} Pcs
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                /* MULTI-VARIANT STOCK GRID */
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Set individual quantities for each variant:
-                    </span>
-                    <Button type="button" size="sm" variant="secondary" onClick={handleAddVariantRow}>
-                      + Add Variant Row
-                    </Button>
-                  </div>
+              {/* Single vs Variant Toggle */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setProductType('simple')}
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
+                    productType === 'simple'
+                      ? 'bg-primary-600 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Standard (Single Stock)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProductType('variants')}
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
+                    productType === 'variants'
+                      ? 'bg-primary-600 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Multi-Variant (Sizes/Colors)
+                </button>
+              </div>
+            </div>
 
-                  <div className="space-y-2">
-                    {formData.variants.map((v, idx) => (
-                      <div key={idx} className="grid grid-cols-5 gap-2 items-center bg-white dark:bg-slate-900 p-2 rounded-lg border text-xs">
+            {productType === 'simple' ? (
+              /* SINGLE PRODUCT INITIAL / CURRENT QUANTITY INPUT */
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                <div className="sm:col-span-2">
+                  <Input
+                    label={editingProduct ? "Current Stock (Pcs / Units) *" : "Initial Quantity / Stock Added (Pcs / Units) *"}
+                    type="number"
+                    min="0"
+                    required
+                    value={formData.initialStock}
+                    onChange={(e) => setFormData({ ...formData, initialStock: e.target.value })}
+                    placeholder="e.g. 50"
+                    helperText="Total units that will immediately be updated in Central Inventory balance."
+                  />
+                </div>
+                <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-primary-200 dark:border-primary-800 text-center">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Quantity</span>
+                  <span className="text-xl font-black text-emerald-600">
+                    {formData.initialStock || 0} Pcs
+                  </span>
+                </div>
+              </div>
+            ) : (
+              /* MULTI-VARIANT STOCK GRID */
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Sizes, Colors & Stock Quantities:
+                  </span>
+                  <Button type="button" size="sm" variant="secondary" onClick={handleAddVariantRow}>
+                    + Add Size / Variant
+                  </Button>
+                </div>
+
+                {/* Bulk Variant Quick-Fill Bar */}
+                {formData.variants.length > 1 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-100/90 dark:bg-slate-800/90 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+                    <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                      ⚡ Quick Bulk-Apply to All Sizes:
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          placeholder="Price (₹)"
+                          value={bulkApplyPrice}
+                          onChange={(e) => setBulkApplyPrice(e.target.value)}
+                          className="w-24 p-1.5 text-xs border rounded bg-white dark:bg-slate-900 font-semibold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!bulkApplyPrice) return;
+                            setFormData((prev) => ({
+                              ...prev,
+                              variants: prev.variants.map((v) => ({ ...v, price: bulkApplyPrice }))
+                            }));
+                          }}
+                          className="px-2 py-1 text-[11px] font-bold bg-primary-600 hover:bg-primary-700 text-white rounded transition-colors"
+                        >
+                          Set Price
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          placeholder="Stock (Qty)"
+                          value={bulkApplyStock}
+                          onChange={(e) => setBulkApplyStock(e.target.value)}
+                          className="w-24 p-1.5 text-xs border rounded bg-white dark:bg-slate-900 font-semibold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!bulkApplyStock) return;
+                            setFormData((prev) => ({
+                              ...prev,
+                              variants: prev.variants.map((v) => ({ ...v, initialStock: bulkApplyStock }))
+                            }));
+                          }}
+                          className="px-2 py-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors"
+                        >
+                          Set Stock
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Variant Column Headers */}
+                <div className="grid grid-cols-12 gap-2 text-[11px] font-bold uppercase text-slate-500 px-2">
+                  <div className="col-span-3">Color</div>
+                  <div className="col-span-3">Size (e.g. S, M, L, XL)</div>
+                  <div className="col-span-3">Price (₹)</div>
+                  <div className="col-span-2">Stock (Qty)</div>
+                  <div className="col-span-1 text-right">Del</div>
+                </div>
+
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {formData.variants.map((v, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-xs shadow-xs">
+                      <div className="col-span-3">
                         <input
                           type="text"
                           placeholder="Color (e.g. Blue)"
@@ -988,19 +1661,23 @@ export const Products = () => {
                             copy[idx].color = e.target.value;
                             setFormData({ ...formData, variants: copy });
                           }}
-                          className="p-1.5 border rounded bg-slate-50 dark:bg-slate-800"
+                          className="w-full p-1.5 border rounded bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
+                      </div>
+                      <div className="col-span-3">
                         <input
                           type="text"
-                          placeholder="Size (e.g. 0-3M)"
+                          placeholder="Size (e.g. S, M, XL)"
                           value={v.size}
                           onChange={(e) => {
                             const copy = [...formData.variants];
                             copy[idx].size = e.target.value;
                             setFormData({ ...formData, variants: copy });
                           }}
-                          className="p-1.5 border rounded bg-slate-50 dark:bg-slate-800"
+                          className="w-full p-1.5 border rounded bg-slate-50 dark:bg-slate-800 font-bold text-slate-900 dark:text-white"
                         />
+                      </div>
+                      <div className="col-span-3">
                         <input
                           type="number"
                           placeholder="Price (₹)"
@@ -1010,50 +1687,55 @@ export const Products = () => {
                             copy[idx].price = e.target.value;
                             setFormData({ ...formData, variants: copy });
                           }}
-                          className="p-1.5 border rounded bg-slate-50 dark:bg-slate-800"
+                          className="w-full p-1.5 border rounded bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-slate-400">Qty:</span>
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="Stock"
-                            value={v.initialStock}
-                            onChange={(e) => {
-                              const copy = [...formData.variants];
-                              copy[idx].initialStock = e.target.value;
-                              setFormData({ ...formData, variants: copy });
-                            }}
-                            className="w-full p-1.5 border rounded bg-slate-50 dark:bg-slate-800 font-bold text-emerald-600"
-                          />
-                        </div>
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Qty"
+                          value={v.initialStock}
+                          onChange={(e) => {
+                            const copy = [...formData.variants];
+                            copy[idx].initialStock = e.target.value;
+                            setFormData({ ...formData, variants: copy });
+                          }}
+                          className="w-full p-1.5 border rounded bg-slate-50 dark:bg-slate-800 font-black text-emerald-600 dark:text-emerald-400"
+                        />
+                      </div>
+                      <div className="col-span-1 text-right">
                         <button
                           type="button"
                           onClick={() => handleRemoveVariantRow(idx)}
-                          className="text-rose-500 hover:text-rose-700 font-bold text-right"
+                          className="text-rose-500 hover:text-rose-700 font-bold px-1 py-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                          title="Remove variant"
                         >
-                          Remove
+                          ✕
                         </button>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
+                </div>
 
-                  {/* Total summary badge */}
-                  <div className="flex justify-end items-center gap-2 pt-2 text-xs">
-                    <span className="font-semibold text-slate-600 dark:text-slate-400">Total Stock Across All Variants:</span>
+                {/* Total summary badge */}
+                <div className="flex justify-between items-center pt-2 text-xs border-t border-slate-200 dark:border-slate-800">
+                  <span className="text-slate-500 font-medium">{formData.variants.length} variant(s) defined</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-600 dark:text-slate-400">Total Live Stock:</span>
                     <span className="font-black text-emerald-600 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/50 rounded-lg border border-emerald-200 dark:border-emerald-800">
                       {calculateTotalVariantStock()} Units
                     </span>
                   </div>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
             <Button variant="outline" onClick={() => setShowProductModal(false)}>Cancel</Button>
             <Button type="submit">
-              {editingProduct ? 'Update Product & Photos' : `Save Product (${calculateTotalVariantStock()} Units)`}
+              {editingProduct ? 'Update Product, Variants & Stock' : `Save Product (${calculateTotalVariantStock()} Units)`}
             </Button>
           </div>
         </form>
@@ -1323,6 +2005,274 @@ export const Products = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* BULK EXCEL UPLOAD MODAL */}
+      <Modal
+        isOpen={showBulkModal}
+        onClose={() => {
+          if (!uploadingBulk) setShowBulkModal(false);
+        }}
+        title="Bulk Product Import (Excel / CSV)"
+        size="2xl"
+      >
+        <div className="space-y-5">
+          {!bulkResult ? (
+            <>
+              {/* Warehouse Selection & Template Download Header */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    Upload Products Spreadsheet
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Supports 15 dynamic columns (Multi-variants auto-grouped by Master SKU).
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-emerald-600/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                  >
+                    <Download className="w-3.5 h-3.5 mr-1" /> Download Sample Template (.xlsx)
+                  </Button>
+                </div>
+              </div>
+
+              {/* Target Warehouse Selector */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Credit Initial Stock To Warehouse *
+                  </label>
+                  <Select
+                    value={bulkWarehouseId}
+                    onChange={(e) => setBulkWarehouseId(e.target.value)}
+                    options={warehouses.map((w) => ({
+                      value: w._id,
+                      label: `${w.name} (${w.code || 'Primary Hub'})`
+                    }))}
+                  />
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                    All `Stock Qty` values will immediately be credited to this facility's Central Inventory balance.
+                  </p>
+                </div>
+
+                {/* Upload Drag & Drop Trigger */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Select Spreadsheet File (.xlsx, .xls, .csv) *
+                  </label>
+                  <input
+                    type="file"
+                    ref={bulkFileInputRef}
+                    accept=".xlsx,.xls,.csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleBulkFileParse(file);
+                    }}
+                  />
+                  <div
+                    onClick={() => bulkFileInputRef.current?.click()}
+                    className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 rounded-xl p-3 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-950/50 transition-colors flex items-center justify-center gap-2.5 h-[58px]"
+                  >
+                    <Upload className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
+                      {bulkFile ? bulkFile.name : 'Click to choose or drop Excel file'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Parsed Stats & Live Preview Table */}
+              {bulkRows.length > 0 && (
+                <div className="space-y-3">
+                  {/* KPI Chips */}
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="p-2.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-center">
+                      <span className="text-[10px] uppercase font-semibold text-slate-500 block">Total Rows</span>
+                      <strong className="text-sm font-bold text-slate-900 dark:text-white">{bulkStats.totalRows}</strong>
+                    </div>
+                    <div className="p-2.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-center">
+                      <span className="text-[10px] uppercase font-semibold text-slate-500 block">Master Products</span>
+                      <strong className="text-sm font-bold text-primary-600 dark:text-primary-400">{bulkStats.parentCount}</strong>
+                    </div>
+                    <div className="p-2.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-center">
+                      <span className="text-[10px] uppercase font-semibold text-slate-500 block">Variants</span>
+                      <strong className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{bulkStats.variantCount}</strong>
+                    </div>
+                    <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 rounded-lg text-center">
+                      <span className="text-[10px] uppercase font-semibold text-emerald-600 dark:text-emerald-400 block">Total Stock</span>
+                      <strong className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{bulkStats.totalStock} Pcs</strong>
+                    </div>
+                  </div>
+
+                  {/* Scrollable Preview Table */}
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+                    <div className="max-h-72 overflow-y-auto overflow-x-auto text-xs">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-100 dark:bg-slate-900 sticky top-0 border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                          <tr>
+                            <th className="p-2.5">Row</th>
+                            <th className="p-2.5">Image</th>
+                            <th className="p-2.5">Product Title</th>
+                            <th className="p-2.5">Master SKU</th>
+                            <th className="p-2.5">Category</th>
+                            <th className="p-2.5">Variant (Size/Color)</th>
+                            <th className="p-2.5">Variant SKU</th>
+                            <th className="p-2.5 text-right">Price</th>
+                            <th className="p-2.5 text-right">Stock</th>
+                            <th className="p-2.5 text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70 bg-white dark:bg-slate-950">
+                          {bulkRows.map((r, i) => (
+                            <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-900/40">
+                              <td className="p-2.5 font-mono text-[10px] text-slate-400">{r.rowNum}</td>
+                              <td className="p-2.5">
+                                {r.imageUrl ? (
+                                  <img
+                                    src={r.imageUrl}
+                                    alt=""
+                                    className="w-8 h-8 rounded object-cover border border-slate-200 dark:border-slate-800"
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                                    <ImageIcon className="w-3.5 h-3.5" />
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-2.5 font-medium text-slate-900 dark:text-white max-w-[160px] truncate" title={r.title}>
+                                {r.title || <span className="text-rose-500 font-bold">Missing</span>}
+                              </td>
+                              <td className="p-2.5 font-mono font-semibold text-primary-600 dark:text-primary-400">
+                                {r.sku || <span className="text-rose-500 font-bold">Missing</span>}
+                              </td>
+                              <td className="p-2.5 text-slate-600 dark:text-slate-400">{r.category || 'General'}</td>
+                              <td className="p-2.5 text-slate-600 dark:text-slate-400">
+                                {r.variantSize || r.variantColor ? (
+                                  <span className="px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-mono text-[10px]">
+                                    {r.variantSize || '-'}/{r.variantColor || '-'}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 text-[10px]">Single Item</span>
+                                )}
+                              </td>
+                              <td className="p-2.5 font-mono text-[11px] text-slate-600 dark:text-slate-400">{r.variantSku}</td>
+                              <td className="p-2.5 text-right font-medium text-slate-900 dark:text-white">₹{r.variantPrice || r.sellingPrice}</td>
+                              <td className="p-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">{r.stockQty} Pcs</td>
+                              <td className="p-2.5 text-center">
+                                {r.isValid ? (
+                                  <span className="inline-flex items-center text-emerald-500 text-[10px] font-bold">
+                                    <Check className="w-3 h-3 mr-0.5" /> Ready
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center text-rose-500 text-[10px] font-bold" title={r.missingFields.join(', ')}>
+                                    <X className="w-3 h-3 mr-0.5" /> {r.missingFields[0]}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={uploadingBulk}
+                  onClick={() => setShowBulkModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  disabled={uploadingBulk || bulkRows.length === 0}
+                  onClick={handleConfirmBulkUpload}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                >
+                  {uploadingBulk ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing Import...
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="w-4 h-4 mr-1.5" /> Confirm & Import {bulkRows.length} Row(s)
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
+          ) : (
+            /* Result Screen */
+            <div className="text-center py-6 space-y-4">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto border-2 border-emerald-500 shadow-md">
+                <CheckCheck className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Bulk Product Import Completed!
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Products and variants have been generated and stock credited to Central Inventory.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 max-w-md mx-auto p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-center">
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-semibold block">Products</span>
+                  <strong className="text-lg font-bold text-slate-900 dark:text-white">{bulkResult.createdProductsCount}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-semibold block">Variants</span>
+                  <strong className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{bulkResult.createdVariantsCount}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-semibold block">Credited Stock</span>
+                  <strong className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{bulkResult.totalStockCredited} Pcs</strong>
+                </div>
+              </div>
+
+              {bulkResult.errors && bulkResult.errors.length > 0 && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-xl text-left text-xs text-amber-700 dark:text-amber-300">
+                  <p className="font-semibold mb-1">Warnings / Skips ({bulkResult.errors.length}):</p>
+                  <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
+                    {bulkResult.errors.map((err, idx) => (
+                      <li key={idx}>SKU {err.masterSku}: {err.error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <Button
+                  onClick={() => {
+                    setShowBulkModal(false);
+                    setBulkResult(null);
+                    setBulkRows([]);
+                    setBulkFile(null);
+                  }}
+                  className="bg-primary-600 hover:bg-primary-700 text-white font-medium"
+                >
+                  View Product Catalog
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );

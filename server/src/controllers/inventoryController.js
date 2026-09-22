@@ -1,6 +1,7 @@
 import { Inventory } from '../models/Inventory.js';
 import { InventoryTransaction } from '../models/InventoryTransaction.js';
 import { ProductVariant } from '../models/ProductVariant.js';
+import { Product } from '../models/Product.js';
 import { INVENTORY_TRANSACTION_TYPES } from '../config/constants.js';
 import { inventoryService } from '../services/inventoryService.js';
 import { createNotification } from '../services/notificationService.js';
@@ -9,7 +10,12 @@ import { logAudit } from '../middlewares/auditMiddleware.js';
 export const getInventoryOverview = async (req, res) => {
   try {
     const { warehouseId, filter, search, page = 1, limit = 25 } = req.query;
-    const query = {};
+    
+    // Only query inventory for active, non-deleted products
+    const activeProducts = await Product.find({ isDeleted: false }).select('_id');
+    const activeProductIds = activeProducts.map((p) => p._id);
+
+    const query = { productId: { $in: activeProductIds } };
 
     if (warehouseId) query.warehouseId = warehouseId;
 
@@ -43,8 +49,13 @@ export const getInventoryOverview = async (req, res) => {
     ]);
 
     // Calculate aggregated inventory KPIs
+    const matchStage = { productId: { $in: activeProductIds } };
+    if (warehouseId) {
+      matchStage.warehouseId = new (await import('mongoose')).default.Types.ObjectId(warehouseId);
+    }
+
     const [stats] = await Inventory.aggregate([
-      ...(warehouseId ? [{ $match: { warehouseId: new (await import('mongoose')).default.Types.ObjectId(warehouseId) } }] : []),
+      { $match: matchStage },
       {
         $group: {
           _id: null,

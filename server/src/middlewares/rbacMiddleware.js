@@ -1,4 +1,4 @@
-export const requirePermission = (permissionCode) => {
+export const requirePermission = (...permissionCodes) => {
   return (req, res, next) => {
     if (!req.user || !req.user.role) {
       return res.status(403).json({
@@ -16,11 +16,12 @@ export const requirePermission = (permissionCode) => {
     }
 
     const permissions = role.permissions || [];
-    if (!permissions.includes(permissionCode)) {
+    const hasPerm = permissionCodes.some((code) => permissions.includes(code));
+    if (!hasPerm) {
       return res.status(403).json({
         success: false,
         code: 'PERMISSION_DENIED',
-        message: `You lack required permission: [${permissionCode}] to perform this operation.`
+        message: `You lack required permission: [${permissionCodes.join(' or ')}] to perform this operation.`
       });
     }
 

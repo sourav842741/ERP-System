@@ -3,6 +3,7 @@ import { ProductVariant } from '../models/ProductVariant.js';
 import { Category } from '../models/Category.js';
 import { Warehouse } from '../models/Warehouse.js';
 import { Inventory } from '../models/Inventory.js';
+import { MarketplaceListing } from '../models/MarketplaceListing.js';
 import { INVENTORY_TRANSACTION_TYPES } from '../config/constants.js';
 import { inventoryService } from '../services/inventoryService.js';
 import { logAudit } from '../middlewares/auditMiddleware.js';
@@ -161,16 +162,17 @@ export const getProducts = async (req, res) => {
 
     const invMap = inventories.reduce((acc, inv) => {
       const vId = String(inv.variantId);
-      if (!acc[vId]) acc[vId] = { physicalStock: 0, availableStock: 0, reservedStock: 0 };
+      if (!acc[vId]) acc[vId] = { physicalStock: 0, availableStock: 0, reservedStock: 0, minimumStock: 0 };
       acc[vId].physicalStock += inv.physicalStock;
       acc[vId].availableStock += inv.availableStock;
       acc[vId].reservedStock += inv.reservedStock;
+      acc[vId].minimumStock = Math.max(acc[vId].minimumStock, inv.minimumStock || 0);
       return acc;
     }, {});
 
     const variantsWithStock = variants.map((v) => ({
       ...v.toObject(),
-      stock: invMap[String(v._id)] || { physicalStock: 0, availableStock: 0, reservedStock: 0 }
+      stock: invMap[String(v._id)] || { physicalStock: 0, availableStock: 0, reservedStock: 0, minimumStock: 10 }
     }));
 
     const variantMap = variantsWithStock.reduce((acc, v) => {
@@ -184,12 +186,16 @@ export const getProducts = async (req, res) => {
       const pVars = variantMap[String(p._id)] || [];
       const totalPhysical = pVars.reduce((sum, v) => sum + (v.stock?.physicalStock || 0), 0);
       const totalAvailable = pVars.reduce((sum, v) => sum + (v.stock?.availableStock || 0), 0);
+      const totalMin = pVars.length > 0
+        ? pVars.reduce((sum, v) => sum + (v.stock?.minimumStock || 0), 0)
+        : 10;
 
       return {
         ...p.toObject(),
         variants: pVars,
         totalStock: totalPhysical,
-        availableStock: totalAvailable
+        availableStock: totalAvailable,
+        minimumStock: totalMin
       };
     });
 
@@ -369,26 +375,138 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const { variants, initialStock, warehouseId, ...updates } = req.body;
 
     const product = await Product.findById(id);
     if (!product || product.isDeleted) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    // Assign updates
+    // Determine target warehouse
+    let targetWarehouse = null;
+    if (warehouseId) {
+      targetWarehouse = await Warehouse.findById(warehouseId);
+    }
+    if (!targetWarehouse) {
+      targetWarehouse = (await Warehouse.findOne({ isDefault: true })) || (await Warehouse.findOne());
+    }
+
+    // Assign top-level product updates
     Object.assign(product, updates);
     await product.save();
+
+    // Update variants if provided
+    if (variants && Array.isArray(variants)) {
+      const existingVariants = await ProductVariant.find({ productId: id, isDeleted: false });
+      const existingVarMap = new Map();
+      existingVariants.forEach((v) => existingVarMap.set(String(v._id), v));
+
+      const processedVariantIds = new Set();
+
+      for (let vIdx = 0; vIdx < variants.length; vIdx++) {
+        const vData = variants[vIdx];
+        const vSize = (vData.size || '').toString().trim();
+        const vColor = (vData.color || '').toString().trim();
+        const vPrice = Number(vData.price) || product.sellingPrice;
+        const vCost = Number(vData.costPrice) || product.costPrice;
+        const rawVSku = (vData.sku || '').toString().trim();
+        const vSKU = (rawVSku || `${product.sku}-${vColor || 'V'}-${vSize || (vIdx + 1)}`).toUpperCase();
+
+        let variantDoc = null;
+        if (vData._id && existingVarMap.has(String(vData._id))) {
+          // Update existing variant
+          variantDoc = existingVarMap.get(String(vData._id));
+          variantDoc.size = vSize;
+          variantDoc.color = vColor;
+          variantDoc.price = vPrice;
+          variantDoc.costPrice = vCost;
+          if (rawVSku) variantDoc.sku = vSKU;
+          await variantDoc.save();
+          processedVariantIds.add(String(variantDoc._id));
+        } else {
+          // Check if variant with SKU already exists
+          variantDoc = await ProductVariant.findOne({ productId: id, sku: vSKU });
+          if (!variantDoc) {
+            variantDoc = await ProductVariant.create({
+              productId: id,
+              sku: vSKU,
+              barcode: vSKU,
+              size: vSize,
+              color: vColor,
+              price: vPrice,
+              costPrice: vCost,
+              images: product.images,
+              status: 'active'
+            });
+          } else {
+            variantDoc.isDeleted = false;
+            variantDoc.size = vSize;
+            variantDoc.color = vColor;
+            variantDoc.price = vPrice;
+            await variantDoc.save();
+          }
+          processedVariantIds.add(String(variantDoc._id));
+        }
+
+        // Adjust stock if specified
+        if (targetWarehouse && (vData.initialStock !== undefined || vData.stock !== undefined)) {
+          const newQty = Number(vData.initialStock !== undefined ? vData.initialStock : vData.stock);
+          const currentInv = await inventoryService.getOrCreateInventory(variantDoc._id, targetWarehouse._id, product._id);
+          const diff = newQty - currentInv.physicalStock;
+          if (diff !== 0) {
+            await inventoryService.mutateStock({
+              variantId: variantDoc._id,
+              warehouseId: targetWarehouse._id,
+              type: diff > 0 ? INVENTORY_TRANSACTION_TYPES.ADJUSTMENT_IN : INVENTORY_TRANSACTION_TYPES.ADJUSTMENT_OUT,
+              quantity: Math.abs(diff),
+              referenceType: 'ProductUpdate',
+              referenceId: String(product._id),
+              reason: `Variant ${vSKU} stock updated from ${currentInv.physicalStock} to ${newQty}`,
+              userId: req.user?._id
+            });
+          }
+        }
+      }
+
+      // Soft-delete removed variants
+      for (const [vId, vDoc] of existingVarMap.entries()) {
+        if (!processedVariantIds.has(vId) && variants.length > 0) {
+          vDoc.isDeleted = true;
+          await vDoc.save();
+          await Inventory.deleteMany({ variantId: vId });
+        }
+      }
+    } else if (initialStock !== undefined && targetWarehouse) {
+      // Single item stock update
+      const defaultVariant = await ProductVariant.findOne({ productId: id, isDeleted: false });
+      if (defaultVariant) {
+        const currentInv = await inventoryService.getOrCreateInventory(defaultVariant._id, targetWarehouse._id, product._id);
+        const newQty = Number(initialStock);
+        const diff = newQty - currentInv.physicalStock;
+        if (diff !== 0) {
+          await inventoryService.mutateStock({
+            variantId: defaultVariant._id,
+            warehouseId: targetWarehouse._id,
+            type: diff > 0 ? INVENTORY_TRANSACTION_TYPES.ADJUSTMENT_IN : INVENTORY_TRANSACTION_TYPES.ADJUSTMENT_OUT,
+            quantity: Math.abs(diff),
+            referenceType: 'ProductUpdate',
+            referenceId: String(product._id),
+            reason: `Single product stock updated to ${newQty}`,
+            userId: req.user?._id
+          });
+        }
+      }
+    }
 
     await logAudit({
       req,
       action: 'PRODUCT_UPDATED',
       module: 'Products',
       entityId: id,
-      reason: 'Product updated'
+      reason: 'Product and variants updated'
     });
 
-    res.json({ success: true, message: 'Product updated successfully', data: { product } });
+    res.json({ success: true, message: 'Product and variants updated successfully', data: { product } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -403,13 +521,15 @@ export const deleteProduct = async (req, res) => {
     product.isDeleted = true;
     await product.save();
     await ProductVariant.updateMany({ productId: id }, { isDeleted: true });
+    await Inventory.deleteMany({ productId: id });
+    await MarketplaceListing.deleteMany({ productId: id });
 
     await logAudit({
       req,
       action: 'PRODUCT_DELETED',
       module: 'Products',
       entityId: id,
-      reason: 'Product soft deleted'
+      reason: 'Product soft deleted and inventory purged'
     });
 
     res.json({ success: true, message: 'Product deleted successfully' });
@@ -432,6 +552,8 @@ export const bulkUpdateProducts = async (req, res) => {
     } else if (action === 'delete') {
       await Product.updateMany({ _id: { $in: ids } }, { isDeleted: true });
       await ProductVariant.updateMany({ productId: { $in: ids } }, { isDeleted: true });
+      await Inventory.deleteMany({ productId: { $in: ids } });
+      await MarketplaceListing.deleteMany({ productId: { $in: ids } });
     }
 
     await logAudit({
@@ -443,6 +565,306 @@ export const bulkUpdateProducts = async (req, res) => {
     });
 
     res.json({ success: true, message: `Bulk ${action} applied to ${ids.length} products` });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Bulk Upload Products from parsed Excel sheet
+ * Accurately groups multi-variants by Master SKU (Parent) and credits Central Inventory
+ */
+export const bulkUploadProducts = async (req, res) => {
+  try {
+    const { rows, warehouseId } = req.body;
+    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'No product rows provided for upload.' });
+    }
+
+    // Determine target warehouse for initial stock crediting
+    let targetWarehouse = null;
+    if (warehouseId) {
+      targetWarehouse = await Warehouse.findById(warehouseId);
+    }
+    if (!targetWarehouse) {
+      targetWarehouse = (await Warehouse.findOne({ isDefault: true })) || (await Warehouse.findOne());
+    }
+
+    // Cache categories to prevent repetitive DB lookups
+    const existingCats = await Category.find({ isDeleted: false });
+    const categoryMap = new Map();
+    existingCats.forEach((cat) => {
+      categoryMap.set(cat.name.toLowerCase().trim(), cat);
+    });
+
+    const getOrCreateCategory = async (catName) => {
+      if (!catName || !catName.toString().trim()) {
+        let defaultCat = categoryMap.get('general') || existingCats[0];
+        if (!defaultCat) {
+          defaultCat = await Category.create({ name: 'General', slug: 'general', status: 'active' });
+          categoryMap.set('general', defaultCat);
+        }
+        return defaultCat;
+      }
+      const raw = catName.toString().trim();
+      const normalized = raw.toLowerCase();
+      if (categoryMap.has(normalized)) {
+        return categoryMap.get(normalized);
+      }
+      const slug = normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const newCat = await Category.create({
+        name: raw,
+        slug: slug || `cat-${Date.now()}`,
+        status: 'active'
+      });
+      categoryMap.set(normalized, newCat);
+      return newCat;
+    };
+
+    // Group rows by Master SKU (Parent)
+    const grouped = new Map();
+    rows.forEach((r, idx) => {
+      const rawSku = r.masterSku || r.sku || r['Master SKU (Parent) *'] || r['Master SKU'] || `PROD-${Date.now()}-${idx}`;
+      const masterSku = rawSku.toString().trim().toUpperCase();
+      if (!grouped.has(masterSku)) {
+        grouped.set(masterSku, []);
+      }
+      grouped.get(masterSku).push(r);
+    });
+
+    let createdProductsCount = 0;
+    let createdVariantsCount = 0;
+    let totalStockCredited = 0;
+    const errors = [];
+
+    for (const [masterSku, groupRows] of grouped.entries()) {
+      try {
+        const first = groupRows[0];
+        const rawTitle = first.title || first.name || first['Product Title *'] || first['Product Title'] || `Product ${masterSku}`;
+        const rawCategory = first.categoryName || first.category || first['Category *'] || first['Category'];
+        const rawBrand = first.brand || first['Brand / Manufacturer'] || first['Brand'] || '';
+        const rawHsn = first.hsnCode || first['HSN Code *'] || first['HSN Code'] || '';
+        const rawGst = Number(first.gst || first['GST Tax (%) *'] || first['GST Tax (%)'] || 18);
+        const rawCost = Number(first.costPrice || first['Cost Price (₹)'] || 0);
+        const rawSell = Number(first.sellingPrice || first['Selling Price (₹) *'] || first['Selling Price (₹)'] || 0);
+        const rawMrp = Number(first.mrp || first['MRP (₹) *'] || first['MRP (₹)'] || rawSell || 0);
+        const rawImg = first.imageUrl || first['Image URL'] || '';
+
+        const categoryDoc = await getOrCreateCategory(rawCategory);
+
+        // Check if parent product already exists
+        let product = await Product.findOne({ sku: masterSku });
+        if (!product) {
+          product = await Product.create({
+            name: rawTitle.trim(),
+            sku: masterSku,
+            brand: rawBrand.trim(),
+            category: categoryDoc._id,
+            hsnCode: rawHsn.toString().trim(),
+            gst: rawGst,
+            mrp: rawMrp,
+            costPrice: rawCost,
+            sellingPrice: rawSell,
+            images: rawImg ? [{ url: rawImg.trim() }] : [],
+            status: 'active'
+          });
+          createdProductsCount++;
+        } else {
+          // If reactivating or updating
+          if (product.isDeleted) {
+            product.isDeleted = false;
+            product.status = 'active';
+          }
+          if (rawTitle) product.name = rawTitle.trim();
+          product.category = categoryDoc._id;
+          if (rawBrand) product.brand = rawBrand.trim();
+          if (rawHsn) product.hsnCode = rawHsn.toString().trim();
+          if (rawSell > 0) product.sellingPrice = rawSell;
+          if (rawMrp > 0) product.mrp = rawMrp;
+          if (rawCost > 0) product.costPrice = rawCost;
+          if (rawImg && (!product.images || product.images.length === 0)) {
+            product.images = [{ url: rawImg.trim() }];
+          }
+          await product.save();
+        }
+
+        // Determine if this is a Multi-Variant item or Single Standard item
+        const hasVariants = groupRows.length > 1 || groupRows.some((r) => {
+          const s = r.variantSize || r['Variant Size'];
+          const c = r.variantColor || r['Variant Color'];
+          return (s && s.toString().trim()) || (c && c.toString().trim());
+        });
+
+        if (hasVariants) {
+          for (let vIdx = 0; vIdx < groupRows.length; vIdx++) {
+            const vRow = groupRows[vIdx];
+            const sizeStr = (vRow.variantSize || vRow['Variant Size'] || '').toString().trim();
+            const colorStr = (vRow.variantColor || vRow['Variant Color'] || '').toString().trim();
+            const rawVSku = (vRow.variantSku || vRow['Variant SKU (Picker Barcode) [AUTO]'] || vRow['Variant SKU'] || '').toString().trim();
+            const vSKU = (rawVSku || `${masterSku}-${colorStr || 'V'}-${sizeStr || (vIdx + 1)}`).toUpperCase();
+
+            const vPrice = Number(vRow.variantPrice || vRow['Variant Price (₹)'] || vRow.sellingPrice || vRow['Selling Price (₹) *'] || product.sellingPrice);
+            const vCost = Number(vRow.costPrice || vRow['Cost Price (₹)'] || product.costPrice);
+            const vImg = vRow.imageUrl || vRow['Image URL'] || (product.images?.[0]?.url || '');
+
+            let variant = await ProductVariant.findOne({ productId: product._id, sku: vSKU });
+            let isNewVariant = false;
+            if (!variant) {
+              variant = await ProductVariant.create({
+                productId: product._id,
+                sku: vSKU,
+                barcode: vSKU,
+                color: colorStr,
+                size: sizeStr,
+                price: vPrice,
+                costPrice: vCost,
+                images: vImg ? [{ url: vImg.trim() }] : [],
+                status: 'active'
+              });
+              createdVariantsCount++;
+              isNewVariant = true;
+            } else {
+              // Existing variant update (BULK EDIT SUPPORT)
+              if (variant.isDeleted) {
+                variant.isDeleted = false;
+                variant.status = 'active';
+              }
+              if (colorStr) variant.color = colorStr;
+              if (sizeStr) variant.size = sizeStr;
+              if (vPrice > 0) variant.price = vPrice;
+              if (vCost > 0) variant.costPrice = vCost;
+              if (vImg) variant.images = [{ url: vImg.trim() }];
+              await variant.save();
+            }
+
+            // Sync Stock in Central Inventory
+            const stockQty = Number(vRow.stockQty || vRow['Stock Qty *'] || vRow['Stock Qty'] || vRow.initialStock || 0);
+            if (targetWarehouse) {
+              const currentInv = await inventoryService.getOrCreateInventory(variant._id, targetWarehouse._id, product._id);
+              if (isNewVariant) {
+                if (stockQty > 0) {
+                  await inventoryService.mutateStock({
+                    variantId: variant._id,
+                    warehouseId: targetWarehouse._id,
+                    type: INVENTORY_TRANSACTION_TYPES.OPENING_STOCK,
+                    quantity: stockQty,
+                    referenceType: 'ExcelBulkUpload',
+                    referenceId: String(product._id),
+                    reason: `Initial stock added via Excel Bulk Upload (${vSKU})`,
+                    userId: req.user?._id
+                  });
+                  totalStockCredited += stockQty;
+                }
+              } else {
+                // Adjust delta stock for bulk edit
+                const diff = stockQty - currentInv.physicalStock;
+                if (diff !== 0) {
+                  await inventoryService.mutateStock({
+                    variantId: variant._id,
+                    warehouseId: targetWarehouse._id,
+                    type: diff > 0 ? INVENTORY_TRANSACTION_TYPES.ADJUSTMENT_IN : INVENTORY_TRANSACTION_TYPES.ADJUSTMENT_OUT,
+                    quantity: Math.abs(diff),
+                    referenceType: 'ExcelBulkEdit',
+                    referenceId: String(product._id),
+                    reason: `Stock updated via Excel Bulk Edit (${vSKU}) from ${currentInv.physicalStock} to ${stockQty}`,
+                    userId: req.user?._id
+                  });
+                }
+              }
+            }
+          }
+        } else {
+          // Standard Single Variant Product
+          const singleSKU = (first.variantSku || first['Variant SKU (Picker Barcode) [AUTO]'] || product.sku).toString().trim().toUpperCase();
+          let defaultVariant = await ProductVariant.findOne({ productId: product._id, sku: singleSKU });
+          let isNewSingle = false;
+          if (!defaultVariant) {
+            defaultVariant = await ProductVariant.create({
+              productId: product._id,
+              sku: singleSKU,
+              barcode: singleSKU,
+              color: 'Default',
+              size: 'Standard',
+              price: product.sellingPrice,
+              costPrice: product.costPrice,
+              images: product.images,
+              status: 'active'
+            });
+            createdVariantsCount++;
+            isNewSingle = true;
+          } else {
+            if (defaultVariant.isDeleted) {
+              defaultVariant.isDeleted = false;
+              defaultVariant.status = 'active';
+            }
+            defaultVariant.price = product.sellingPrice;
+            defaultVariant.costPrice = product.costPrice;
+            await defaultVariant.save();
+          }
+
+          const stockQty = Number(first.stockQty || first['Stock Qty *'] || first['Stock Qty'] || first.initialStock || 0);
+          if (targetWarehouse) {
+            const currentInv = await inventoryService.getOrCreateInventory(defaultVariant._id, targetWarehouse._id, product._id);
+            if (isNewSingle) {
+              if (stockQty > 0) {
+                await inventoryService.mutateStock({
+                  variantId: defaultVariant._id,
+                  warehouseId: targetWarehouse._id,
+                  type: INVENTORY_TRANSACTION_TYPES.OPENING_STOCK,
+                  quantity: stockQty,
+                  referenceType: 'ExcelBulkUpload',
+                  referenceId: String(product._id),
+                  reason: `Initial stock added via Excel Bulk Upload (${product.sku})`,
+                  userId: req.user?._id
+                });
+                totalStockCredited += stockQty;
+              }
+            } else {
+              const diff = stockQty - currentInv.physicalStock;
+              if (diff !== 0) {
+                await inventoryService.mutateStock({
+                  variantId: defaultVariant._id,
+                  warehouseId: targetWarehouse._id,
+                  type: diff > 0 ? INVENTORY_TRANSACTION_TYPES.ADJUSTMENT_IN : INVENTORY_TRANSACTION_TYPES.ADJUSTMENT_OUT,
+                  quantity: Math.abs(diff),
+                  referenceType: 'ExcelBulkEdit',
+                  referenceId: String(product._id),
+                  reason: `Stock updated via Excel Bulk Edit (${product.sku}) from ${currentInv.physicalStock} to ${stockQty}`,
+                  userId: req.user?._id
+                });
+              }
+            }
+          }
+        }
+      } catch (rowErr) {
+        errors.push({ masterSku, error: rowErr.message });
+      }
+    }
+
+    await logAudit({
+      req,
+      action: 'PRODUCT_BULK_UPLOAD',
+      module: 'Products',
+      newValue: {
+        totalRows: rows.length,
+        createdProductsCount,
+        createdVariantsCount,
+        totalStockCredited,
+        errorCount: errors.length
+      },
+      reason: 'Bulk Excel Product Upload'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Bulk upload processed successfully! Imported ${createdProductsCount} products, ${createdVariantsCount} variants, credited ${totalStockCredited} total stock units to Central Inventory.`,
+      data: {
+        createdProductsCount,
+        createdVariantsCount,
+        totalStockCredited,
+        errors
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

@@ -1,5 +1,10 @@
 import express from 'express';
-import { getDashboardSummary, getFinanceReport, exportReportCSV } from '../controllers/reportController.js';
+import {
+  getDashboardSummary,
+  getFinanceReport,
+  getAnalyticsReport,
+  exportReportCSV
+} from '../controllers/reportController.js';
 import { authenticate } from '../middlewares/authMiddleware.js';
 import { requirePermission } from '../middlewares/rbacMiddleware.js';
 
@@ -8,7 +13,9 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/dashboard', requirePermission('dashboard:view'), getDashboardSummary);
+router.get('/analytics', requirePermission('report:view'), getAnalyticsReport);
 router.get('/finance', requirePermission('report:view'), getFinanceReport);
 router.get('/export/:type', requirePermission('report:export'), exportReportCSV);
 
 export default router;
+
