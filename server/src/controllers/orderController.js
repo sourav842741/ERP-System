@@ -7,6 +7,7 @@ import { emitSocketEvent } from '../services/socketService.js';
 import { createNotification } from '../services/notificationService.js';
 import { enqueueEmail } from '../services/emailService.js';
 import { logAudit } from '../middlewares/auditMiddleware.js';
+import { evaluateOrderRisk } from '../services/rtoRiskService.js';
 
 export const getOrders = async (req, res) => {
   try {
@@ -191,6 +192,20 @@ export const createOrder = async (req, res) => {
 
     // 5. Deduct inventory centrally & atomic stock check
     await inventoryService.deductStockForOrder(order, req.user?._id);
+
+    // 5.5 Auto-evaluate RTO & Fraud Risk
+    try {
+      const riskResult = await evaluateOrderRisk(order);
+      order.rtoRisk = {
+        score: riskResult.score,
+        level: riskResult.level,
+        isFlagged: riskResult.isFlagged,
+        reasons: riskResult.reasons,
+        actionTaken: 'NONE'
+      };
+    } catch (riskErr) {
+      console.warn('RTO risk evaluation error:', riskErr.message);
+    }
 
     // 6. Save order
     await order.save();

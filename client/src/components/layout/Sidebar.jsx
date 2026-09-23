@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, Boxes, ShoppingCart, Store,
   Truck, Warehouse, Users, DollarSign, BarChart3,
   ShieldCheck, Settings, LogOut, ChevronRight, UserCog,
-  Images, Wand2
+  Images, Wand2, Calculator, Barcode, ShieldAlert, Grid
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ProfileModal } from './ProfileModal';
@@ -14,11 +14,15 @@ const NAV_ITEMS = [
   { name: 'Products', path: '/products', icon: Package },
   { name: 'Central Inventory', path: '/inventory', icon: Boxes },
   { name: 'Orders', path: '/orders', icon: ShoppingCart },
+  { name: 'RTO & COD Risk', path: '/rto-risk', icon: ShieldAlert },
+  { name: 'Barcode & Labels', path: '/labels', icon: Barcode },
   { name: 'Marketplaces', path: '/marketplaces', icon: Store },
+  { name: 'Price Calculator', path: '/pricing', icon: Calculator },
   { name: 'Cloud Media Assets', path: '/media', icon: Images },
   { name: 'AI Studio & Crop', path: '/studio', icon: Wand2 },
   { name: 'Purchases', path: '/purchases', icon: Truck },
   { name: 'Warehouses', path: '/warehouses', icon: Warehouse },
+  { name: 'Warehouse 2D Twin', path: '/warehouse-visualizer', icon: Grid },
   { name: 'Customers', path: '/customers', icon: Users },
   { name: 'Finance & P&L', path: '/finance', icon: DollarSign },
   { name: 'Reports', path: '/reports', icon: BarChart3 },

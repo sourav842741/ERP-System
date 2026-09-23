@@ -15,6 +15,7 @@ export const ORDER_SOURCES = {
   FLIPKART: 'Flipkart',
   MEESHO: 'Meesho',
   AMAZON: 'Amazon',
+  MYNTRA: 'Myntra',
   WEBSITE: 'Website',
   MANUAL: 'Manual'
 };
@@ -92,6 +93,10 @@ export const DEFAULT_PERMISSIONS = [
 
   { code: 'marketplace:read', name: 'View Marketplace Listings', category: 'Marketplace' },
   { code: 'marketplace:manage', name: 'Manage Marketplace Listings', category: 'Marketplace' },
+
+  { code: 'pricing:view', name: 'View Pricing Calculator', category: 'Pricing' },
+  { code: 'pricing:calculate', name: 'Calculate Marketplace Pricing', category: 'Pricing' },
+  { code: 'pricing:manage', name: 'Manage Marketplace Rules & Slabs', category: 'Pricing' },
 
   { code: 'finance:view', name: 'View Financials & Expenses', category: 'Finance' },
   { code: 'finance:manage', name: 'Manage Expenses', category: 'Finance' },

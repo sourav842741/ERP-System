@@ -584,55 +584,55 @@ export const ImageStudio = () => {
         }
       `}</style>
 
-      {/* 1. PROFESSIONAL STUDIO HEADER (CLEAN ENTERPRISE DARK THEME) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-xl">
+      {/* 1. PROFESSIONAL STUDIO HEADER (LIGHT & DARK ADAPTIVE) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-xl shadow-2xs">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Image Studio
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Professional cropping, freeform lasso cutout, and PhotoRoom background removal.
           </p>
         </div>
 
         {/* Clean Segmented Control for Tools */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
             <button
               onClick={() => setActiveStudioTab('crop')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 activeStudioTab === 'crop'
-                  ? 'bg-slate-800 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <Crop className="w-3.5 h-3.5 text-blue-400" /> Crop & Aspect Ratio
+              <Crop className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" /> Crop & Aspect Ratio
             </button>
             <button
               onClick={() => setActiveStudioTab('lasso')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 activeStudioTab === 'lasso'
-                  ? 'bg-slate-800 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <Scissors className="w-3.5 h-3.5 text-sky-400" /> Freeform Cutout
+              <Scissors className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" /> Freeform Cutout
             </button>
             <button
               onClick={handleOpenPhotoRoomWithCropped}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 activeStudioTab === 'photoroom'
-                  ? 'bg-slate-800 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <ExternalLink className="w-3.5 h-3.5 text-slate-400" /> PhotoRoom AI
+              <ExternalLink className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> PhotoRoom AI
             </button>
           </div>
 
           {/* CLOUDINARY LIVE SEARCH & ASSET PICKER */}
           <div className="relative" ref={assetDropdownRef}>
-            <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 focus-within:border-blue-500 rounded-lg p-1 transition-all shadow-xs">
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus-within:border-primary-500 rounded-lg p-1 transition-all shadow-2xs">
               <div className="flex items-center gap-1.5 pl-2">
                 <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <input
@@ -641,7 +641,7 @@ export const ImageStudio = () => {
                   onChange={handleSearchAssetChange}
                   onFocus={() => setShowAssetDropdown(true)}
                   placeholder="Search Cloudinary images..."
-                  className="w-40 sm:w-56 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-hidden"
+                  className="w-40 sm:w-56 bg-transparent text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden"
                 />
                 {searchAssetQuery && (
                   <button
@@ -650,7 +650,7 @@ export const ImageStudio = () => {
                       setSearchAssetQuery('');
                       fetchCloudAssets('');
                     }}
-                    className="text-slate-400 hover:text-white p-0.5"
+                    className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-0.5"
                     title="Clear search"
                   >
                     <X className="w-3 h-3" />
@@ -663,13 +663,13 @@ export const ImageStudio = () => {
                 onClick={() => setShowAssetDropdown((prev) => !prev)}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${
                   showAssetDropdown
-                    ? 'bg-blue-600/20 text-blue-400 border-blue-500/40'
-                    : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+                    ? 'bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 border-primary-300 dark:border-primary-800'
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
                 title="Browse Cloudinary Library"
               >
-                <Cloud className="w-3.5 h-3.5 text-sky-400" />
-                <span className="font-semibold text-white">{existingAssets.length}</span>
+                <Cloud className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
+                <span className="font-semibold text-slate-900 dark:text-white">{existingAssets.length}</span>
                 <span className="hidden md:inline text-slate-400">Photos</span>
               </button>
 
@@ -681,7 +681,7 @@ export const ImageStudio = () => {
                   setSavedCloudUrl('');
                   setShowCloudModal(true);
                 }}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors shrink-0"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-primary-600 hover:bg-primary-700 text-white transition-colors shrink-0"
                 title="Save current cutout / upload new image to Cloudinary"
               >
                 <UploadCloud className="w-3.5 h-3.5" />
@@ -691,32 +691,32 @@ export const ImageStudio = () => {
 
             {/* DROPDOWN FLYOUT ASSET GALLERY */}
             {showAssetDropdown && (
-              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="p-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-950/80">
                   <div className="flex items-center gap-2">
-                    <Cloud className="w-4 h-4 text-sky-400" />
+                    <Cloud className="w-4 h-4 text-sky-500 dark:text-sky-400" />
                     <div>
-                      <h4 className="text-xs font-semibold text-white">Cloudinary Images</h4>
+                      <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Cloudinary Images</h4>
                       <p className="text-[10px] text-slate-400">
                         {loadingAssets ? 'Searching...' : `${existingAssets.length} image(s) available`}
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] text-sky-400 font-medium">Click to edit</span>
+                  <span className="text-[10px] text-primary-600 dark:text-primary-400 font-medium">Click to edit</span>
                 </div>
 
                 <div className="p-3 max-h-72 overflow-y-auto space-y-2">
                   {loadingAssets ? (
                     <div className="py-8 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
-                      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                       <span>Loading Cloudinary images...</span>
                     </div>
                   ) : existingAssets.length === 0 ? (
                     <div className="py-8 text-center text-xs text-slate-400">
                       {searchAssetQuery ? (
                         <>
-                          <p className="text-slate-300 font-medium">No images found for "{searchAssetQuery}"</p>
-                          <p className="text-[11px] text-slate-500 mt-1">Try another search keyword or tag.</p>
+                          <p className="text-slate-700 dark:text-slate-300 font-medium">No images found for "{searchAssetQuery}"</p>
+                          <p className="text-[11px] text-slate-400 mt-1">Try another search keyword or tag.</p>
                         </>
                       ) : (
                         <p>No images uploaded to Cloudinary yet.</p>
@@ -731,9 +731,9 @@ export const ImageStudio = () => {
                             loadImage(asset.url, asset.title);
                             setShowAssetDropdown(false);
                           }}
-                          className="group relative rounded-lg border border-slate-800 bg-slate-950 p-2 hover:border-blue-500/70 hover:bg-slate-900 cursor-pointer transition-all flex flex-col gap-1.5 shadow-xs"
+                          className="group relative rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2 hover:border-primary-500 hover:bg-slate-100 dark:hover:bg-slate-900 cursor-pointer transition-all flex flex-col gap-1.5 shadow-2xs"
                         >
-                          <div className="aspect-square w-full rounded-md bg-slate-900 border border-slate-800/80 overflow-hidden flex items-center justify-center p-1">
+                          <div className="aspect-square w-full rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 overflow-hidden flex items-center justify-center p-1">
                             <img
                               src={asset.url}
                               alt={asset.title}
@@ -741,7 +741,7 @@ export const ImageStudio = () => {
                             />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-[11px] font-semibold text-slate-200 truncate group-hover:text-white">
+                            <p className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-primary-600 dark:group-hover:text-white">
                               {asset.title}
                             </p>
                             <span className="text-[9px] text-slate-400 truncate block">
@@ -754,21 +754,21 @@ export const ImageStudio = () => {
                   )}
                 </div>
 
-                <div className="p-2.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setShowAssetDropdown(false);
                       setShowCloudModal(true);
                     }}
-                    className="text-[11px] font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                    className="text-[11px] font-medium text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
                   >
                     <UploadCloud className="w-3 h-3" /> Upload new image
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowAssetDropdown(false)}
-                    className="text-[11px] text-slate-400 hover:text-white"
+                    className="text-[11px] text-slate-400 hover:text-slate-700 dark:hover:text-white"
                   >
                     Close
                   </button>
@@ -783,19 +783,19 @@ export const ImageStudio = () => {
       {activeStudioTab === 'crop' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* CROPPER CANVAS AREA (8 COLS) */}
-          <div className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
+          <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 text-xs">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-200">
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
                   Interactive Crop Canvas
                 </span>
                 {imgRef.current && (
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-mono bg-slate-950 text-slate-400 border border-slate-800">
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-mono bg-slate-100 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800">
                     {imgRef.current.naturalWidth} &times; {imgRef.current.naturalHeight} px
                   </span>
                 )}
                 <span className="text-[11px] text-slate-400">
-                  Mode: <strong className="text-slate-200">{aspect ? 'Locked Ratio' : 'Freeform (Drag Any Size)'}</strong>
+                  Mode: <strong className="text-slate-700 dark:text-slate-300">{aspect ? 'Locked Ratio' : 'Freeform (Drag Any Size)'}</strong>
                 </span>
               </div>
 
@@ -811,7 +811,7 @@ export const ImageStudio = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                  className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   <UploadCloud className="w-3.5 h-3.5 mr-1" /> Open Image
                 </Button>
@@ -819,7 +819,7 @@ export const ImageStudio = () => {
                   variant="secondary"
                   size="sm"
                   onClick={handleOpenAssetPicker}
-                  className="bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                 >
                   <FolderOpen className="w-3.5 h-3.5 mr-1" /> Cloud Assets
                 </Button>
@@ -827,7 +827,7 @@ export const ImageStudio = () => {
             </div>
 
             {/* REACT-IMAGE-CROP CONTAINER */}
-            <div className="relative w-full rounded-xl overflow-hidden min-h-[460px] flex items-center justify-center p-4 bg-[#0a0e17] border border-slate-800">
+            <div className="relative w-full rounded-xl overflow-hidden min-h-[460px] flex items-center justify-center p-4 bg-slate-100/90 dark:bg-[#0a0e17] border border-slate-200 dark:border-slate-800">
               <div
                 style={{
                   transform: `rotate(${rotation}deg) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1}) scale(${zoom})`,
@@ -854,12 +854,12 @@ export const ImageStudio = () => {
             </div>
 
             {/* Crop Actions Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   onClick={handleApplyCrop}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                  className="bg-primary-600 hover:bg-primary-700 text-white font-medium shadow-2xs"
                 >
                   <Crop className="w-3.5 h-3.5 mr-1" /> Apply Crop
                 </Button>
@@ -867,7 +867,7 @@ export const ImageStudio = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => handleDownloadCropped('png')}
-                  className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                  className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   <Download className="w-3.5 h-3.5 mr-1" /> Download PNG
                 </Button>
@@ -875,7 +875,7 @@ export const ImageStudio = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => handleDownloadCropped('jpg')}
-                  className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                  className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   <Download className="w-3.5 h-3.5 mr-1" /> Download JPG
                 </Button>
@@ -884,7 +884,7 @@ export const ImageStudio = () => {
               <Button
                 size="sm"
                 onClick={handleOpenCloudWithCropped}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium"
+                className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-medium"
               >
                 <UploadCloud className="w-3.5 h-3.5 mr-1" /> Save to Cloud Media
               </Button>
@@ -892,18 +892,18 @@ export const ImageStudio = () => {
 
             {/* Cropped Output Preview Box */}
             {croppedResultUrl && (
-              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between gap-4">
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <img
                     src={croppedResultUrl}
                     alt="Cropped Preview"
-                    className="w-16 h-16 object-contain rounded-lg bg-slate-900 border border-slate-800 p-1"
+                    className="w-16 h-16 object-contain rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1"
                   />
                   <div>
-                    <span className="text-xs font-semibold text-white block">
+                    <span className="text-xs font-semibold text-slate-900 dark:text-white block">
                       Crop Applied Successfully
                     </span>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
                       Export clean PNG/JPG or upload straight to Cloudinary.
                     </p>
                   </div>
@@ -913,15 +913,15 @@ export const ImageStudio = () => {
                   <Button
                     size="sm"
                     onClick={handleOpenCutoutWithCropped}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                    className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
                     title="Load cropped photo into Native Freeform Cutout"
                   >
-                    <Scissors className="w-3.5 h-3.5 mr-1 text-sky-400" /> Freeform Cutout
+                    <Scissors className="w-3.5 h-3.5 mr-1 text-sky-500" /> Freeform Cutout
                   </Button>
                   <Button
                     size="sm"
                     onClick={handleOpenPhotoRoomWithCropped}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                    className="bg-primary-600 hover:bg-primary-700 text-white font-medium"
                     title="Auto-copy photo & open PhotoRoom for instant Ctrl+V"
                   >
                     <ExternalLink className="w-3.5 h-3.5 mr-1" /> PhotoRoom AI
@@ -932,14 +932,14 @@ export const ImageStudio = () => {
           </div>
 
           {/* CROPPER SIDEBAR CONTROLS (4 COLS) */}
-          <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-semibold text-sm text-white flex items-center gap-1.5">
+          <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-5 shadow-2xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-semibold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
                 <Sliders className="w-4 h-4 text-slate-400" /> Aspect Ratio Presets
               </h3>
               <button
                 onClick={() => handleSelectAspect(undefined)}
-                className="text-[11px] font-medium text-slate-400 hover:text-white flex items-center gap-1"
+                className="text-[11px] font-medium text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center gap-1"
               >
                 <RefreshCw className="w-3 h-3" /> Reset
               </button>
@@ -947,34 +947,39 @@ export const ImageStudio = () => {
 
             {/* Presets Grid */}
             <div className="grid grid-cols-2 gap-2">
-              {ASPECT_PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  onClick={() => handleSelectAspect(preset.value)}
-                  className={`p-2.5 rounded-lg border text-left text-xs transition-colors ${
-                    aspect === preset.value
-                      ? 'border-blue-500 bg-blue-500/10 text-white'
-                      : 'border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="font-medium text-white">{preset.label}</div>
-                  <span className="text-[10px] text-slate-500 block mt-0.5">
-                    {preset.desc}
-                  </span>
-                </button>
-              ))}
+              {ASPECT_PRESETS.map((preset) => {
+                const isSelected = aspect === preset.value;
+                return (
+                  <button
+                    key={preset.label}
+                    onClick={() => handleSelectAspect(preset.value)}
+                    className={`p-2.5 rounded-lg border text-left text-xs transition-colors ${
+                      isSelected
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/80 text-primary-950 dark:text-primary-100 ring-2 ring-primary-500/20 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div className={`font-semibold ${isSelected ? 'text-primary-900 dark:text-primary-100' : 'text-slate-800 dark:text-slate-200'}`}>
+                      {preset.label}
+                    </div>
+                    <span className={`text-[10px] block mt-0.5 ${isSelected ? 'text-primary-700 dark:text-primary-300 font-medium' : 'text-slate-500 dark:text-slate-400'}`}>
+                      {preset.desc}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Orientation & Transformations */}
-            <div className="space-y-2 pt-2 border-t border-slate-800">
-              <label className="text-xs font-semibold text-slate-300">
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Orientation:
               </label>
               <div className="grid grid-cols-4 gap-2">
                 <button
                   onClick={() => setRotation((r) => (r + 90) % 360)}
                   title="Rotate 90° Clockwise"
-                  className="p-2 rounded-lg border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 flex flex-col items-center justify-center gap-1 text-[10px]"
+                  className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 flex flex-col items-center justify-center gap-1 text-[10px]"
                 >
                   <RotateCw className="w-3.5 h-3.5 text-slate-400" />
                   <span>90° CW</span>
@@ -983,7 +988,7 @@ export const ImageStudio = () => {
                 <button
                   onClick={() => setRotation((r) => (r - 90 + 360) % 360)}
                   title="Rotate 90° Counter-Clockwise"
-                  className="p-2 rounded-lg border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 flex flex-col items-center justify-center gap-1 text-[10px]"
+                  className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 flex flex-col items-center justify-center gap-1 text-[10px]"
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
                   <span>90° CCW</span>
@@ -993,7 +998,9 @@ export const ImageStudio = () => {
                   onClick={() => setFlipH(!flipH)}
                   title="Flip Horizontal"
                   className={`p-2 rounded-lg border flex flex-col items-center justify-center gap-1 text-[10px] ${
-                    flipH ? 'border-blue-500 bg-blue-500/10 text-white' : 'border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800'
+                    flipH
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/80 text-primary-900 dark:text-primary-200 ring-1 ring-primary-500/20'
+                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
                   <FlipHorizontal className="w-3.5 h-3.5" />
@@ -1004,7 +1011,9 @@ export const ImageStudio = () => {
                   onClick={() => setFlipV(!flipV)}
                   title="Flip Vertical"
                   className={`p-2 rounded-lg border flex flex-col items-center justify-center gap-1 text-[10px] ${
-                    flipV ? 'border-blue-500 bg-blue-500/10 text-white' : 'border-slate-800 bg-slate-950 text-slate-300 hover:bg-slate-800'
+                    flipV
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/80 text-primary-900 dark:text-primary-200 ring-1 ring-primary-500/20'
+                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
                   <FlipVertical className="w-3.5 h-3.5" />
@@ -1014,10 +1023,10 @@ export const ImageStudio = () => {
             </div>
 
             {/* Zoom Slider */}
-            <div className="space-y-1.5 pt-2 border-t border-slate-800">
+            <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
               <div className="flex items-center justify-between text-xs">
-                <label className="text-slate-300">Zoom</label>
-                <span className="font-mono text-slate-400">{Math.round(zoom * 100)}%</span>
+                <label className="text-slate-700 dark:text-slate-300 font-medium">Zoom</label>
+                <span className="font-mono text-slate-500">{Math.round(zoom * 100)}%</span>
               </div>
               <input
                 type="range"
@@ -1026,22 +1035,22 @@ export const ImageStudio = () => {
                 step="0.05"
                 value={zoom}
                 onChange={(e) => setZoom(Number(e.target.value))}
-                className="w-full accent-blue-500"
+                className="w-full accent-primary-600"
               />
             </div>
 
             {/* Cloud Media & Presets */}
-            <div className="pt-2 border-t border-slate-800 space-y-2">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Cloud className="w-3.5 h-3.5 text-sky-400" />
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Cloud className="w-3.5 h-3.5 text-sky-500" />
                   {existingAssets.length > 0 ? 'Cloudinary Assets:' : 'Sample Assets:'}
                 </label>
                 {existingAssets.length > 0 && (
                   <button
                     type="button"
                     onClick={() => setShowAssetDropdown(true)}
-                    className="text-[10px] text-blue-400 hover:text-blue-300 hover:underline"
+                    className="text-[10px] text-primary-600 dark:text-primary-400 hover:underline"
                   >
                     View All ({existingAssets.length})
                   </button>
@@ -1055,11 +1064,11 @@ export const ImageStudio = () => {
                       key={asset._id}
                       type="button"
                       onClick={() => loadImage(asset.url, asset.title)}
-                      className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left text-[11px] font-medium text-slate-300 flex items-center gap-1.5 truncate group transition-colors"
+                      className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-left text-[11px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5 truncate group transition-colors"
                       title={`${asset.title} - Click to edit in studio`}
                     >
                       <img src={asset.url} alt={asset.title} className="w-5 h-5 rounded-xs object-cover shrink-0" />
-                      <span className="truncate group-hover:text-white">{asset.title}</span>
+                      <span className="truncate group-hover:text-primary-600 dark:group-hover:text-white">{asset.title}</span>
                     </button>
                   ))}
                 </div>
@@ -1070,7 +1079,7 @@ export const ImageStudio = () => {
                       key={sample.name}
                       type="button"
                       onClick={() => loadImage(sample.url, sample.name)}
-                      className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left text-[11px] font-medium text-slate-300 flex items-center gap-1.5 truncate"
+                      className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-left text-[11px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5 truncate"
                     >
                       <img src={sample.url} alt={sample.name} className="w-5 h-5 rounded-xs object-cover shrink-0" />
                       <span className="truncate">{sample.name.split(' ')[0]}</span>
@@ -1087,13 +1096,13 @@ export const ImageStudio = () => {
       {activeStudioTab === 'lasso' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* LASSO CANVAS WORKSPACE (8 COLS) */}
-          <div className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
+          <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 text-xs">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-slate-900 dark:text-white">
                   Freeform Cutout Workspace
                 </span>
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
                   {lassoMode === 'freehand'
                     ? 'Drag cursor freely around object'
                     : 'Click points around object boundary'}
@@ -1101,13 +1110,13 @@ export const ImageStudio = () => {
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
                   <button
                     onClick={() => setLassoMode('freehand')}
                     className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                       lassoMode === 'freehand'
-                        ? 'bg-slate-800 text-white'
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                     }`}
                   >
                     <PenTool className="w-3 h-3 inline mr-1" /> Freehand
@@ -1116,8 +1125,8 @@ export const ImageStudio = () => {
                     onClick={() => setLassoMode('polygon')}
                     className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                       lassoMode === 'polygon'
-                        ? 'bg-slate-800 text-white'
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                     }`}
                   >
                     <MousePointer className="w-3 h-3 inline mr-1" /> Polygon Points
@@ -1129,7 +1138,7 @@ export const ImageStudio = () => {
                   size="sm"
                   onClick={() => setLassoPoints((prev) => prev.slice(0, -1))}
                   disabled={lassoPoints.length === 0}
-                  className="border-slate-700 text-slate-300 hover:bg-slate-800 text-[11px] h-7 px-2"
+                  className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] h-7 px-2"
                   title="Undo point"
                 >
                   <Undo2 className="w-3 h-3" />
@@ -1139,7 +1148,7 @@ export const ImageStudio = () => {
                   size="sm"
                   onClick={() => setLassoPoints([])}
                   disabled={lassoPoints.length === 0}
-                  className="border-slate-700 text-slate-300 hover:bg-slate-800 text-[11px] h-7 px-2"
+                  className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] h-7 px-2"
                   title="Clear path"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -1148,7 +1157,7 @@ export const ImageStudio = () => {
             </div>
 
             {/* INTERACTIVE CUTOUT CANVAS */}
-            <div className="relative w-full rounded-xl overflow-hidden min-h-[460px] flex items-center justify-center p-4 bg-[#0a0e17] border border-slate-800 select-none">
+            <div className="relative w-full rounded-xl overflow-hidden min-h-[460px] flex items-center justify-center p-4 bg-slate-100/90 dark:bg-[#0a0e17] border border-slate-200 dark:border-slate-800 select-none">
               <canvas
                 ref={lassoCanvasRef}
                 onMouseDown={handleLassoMouseDown}
@@ -1162,13 +1171,13 @@ export const ImageStudio = () => {
             </div>
 
             {/* Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-800 text-xs">
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   onClick={handlePerformLassoCutout}
                   disabled={lassoPoints.length < 3}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50"
+                  className="bg-primary-600 hover:bg-primary-700 text-white font-medium disabled:opacity-50"
                 >
                   <Scissors className="w-3.5 h-3.5 mr-1" /> Cut Out Selection
                 </Button>
@@ -1177,7 +1186,7 @@ export const ImageStudio = () => {
                     variant="outline"
                     size="sm"
                     onClick={handleDownloadCutout}
-                    className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                    className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                   >
                     <Download className="w-3.5 h-3.5 mr-1" /> Download PNG
                   </Button>
@@ -1188,7 +1197,7 @@ export const ImageStudio = () => {
                 <Button
                   size="sm"
                   onClick={handleOpenCloudWithCutout}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium"
+                  className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-medium"
                 >
                   <UploadCloud className="w-3.5 h-3.5 mr-1" /> Save Cutout to Cloud Media
                 </Button>
@@ -1197,13 +1206,13 @@ export const ImageStudio = () => {
 
             {/* Cutout Result Preview Box */}
             {cutoutResultUrl && (
-              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between gap-4">
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div
-                    className="w-16 h-16 rounded-lg border border-slate-800 flex items-center justify-center p-1"
+                    className="w-16 h-16 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-center p-1 bg-white dark:bg-slate-900"
                     style={{
                       backgroundImage:
-                        'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
+                        'linear-gradient(45deg, #cbd5e1 25%, transparent 25%), linear-gradient(-45deg, #cbd5e1 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #cbd5e1 75%), linear-gradient(-45deg, transparent 75%, #cbd5e1 75%)',
                       backgroundSize: '10px 10px',
                       backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px'
                     }}
@@ -1215,10 +1224,10 @@ export const ImageStudio = () => {
                     />
                   </div>
                   <div>
-                    <span className="text-xs font-semibold text-white block">
+                    <span className="text-xs font-semibold text-slate-900 dark:text-white block">
                       Cutout Ready (Transparent PNG)
                     </span>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
                       Isolated subject background removed via freeform boundary.
                     </p>
                   </div>
@@ -1228,7 +1237,7 @@ export const ImageStudio = () => {
                   <Button
                     size="sm"
                     onClick={handleDownloadCutout}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-primary-600 hover:bg-primary-700 text-white"
                   >
                     <Download className="w-3.5 h-3.5 mr-1" /> Download PNG
                   </Button>
@@ -1238,14 +1247,14 @@ export const ImageStudio = () => {
           </div>
 
           {/* LASSO SIDEBAR INSTRUCTIONS & PREVIEWS (4 COLS) */}
-          <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-            <h3 className="font-semibold text-sm text-white flex items-center gap-1.5 pb-3 border-b border-slate-800">
-              <Scissors className="w-4 h-4 text-slate-400" /> Freeform Cut Guide
+          <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
+            <h3 className="font-semibold text-sm text-slate-900 dark:text-white flex items-center gap-1.5 pb-3 border-b border-slate-200 dark:border-slate-800">
+              <Scissors className="w-4 h-4 text-primary-500" /> Freeform Cut Guide
             </h3>
 
-            <div className="space-y-3 text-xs text-slate-400 leading-relaxed">
-              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-1">
-                <span className="font-semibold text-slate-200 block">1. Choose Cut Mode</span>
+            <div className="space-y-3 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-1">
+                <span className="font-semibold text-slate-900 dark:text-slate-200 block">1. Choose Cut Mode</span>
                 <p className="text-[11px]">
                   <strong>Freehand:</strong> Click and hold mouse/finger to draw a continuous path around the product.
                 </p>
@@ -1254,15 +1263,15 @@ export const ImageStudio = () => {
                 </p>
               </div>
 
-              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-1">
-                <span className="font-semibold text-slate-200 block">2. Complete & Cut</span>
+              <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-1">
+                <span className="font-semibold text-slate-900 dark:text-slate-200 block">2. Complete & Cut</span>
                 <p className="text-[11px]">
                   Once your path encloses the target item, click <strong>Cut Out Selection</strong> to automatically clip the background into a transparent PNG.
                 </p>
               </div>
 
-              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-1">
-                <span className="font-semibold text-slate-200 block">3. Cloud Media Sync</span>
+              <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-1">
+                <span className="font-semibold text-slate-900 dark:text-slate-200 block">3. Cloud Media Sync</span>
                 <p className="text-[11px]">
                   Upload the cutout directly to Cloudinary for permanent public shareable URLs (ready for Amazon / Meesho / WhatsApp catalog).
                 </p>
@@ -1270,14 +1279,14 @@ export const ImageStudio = () => {
             </div>
 
             {/* Change Asset */}
-            <div className="pt-2 border-t border-slate-800 space-y-2">
-              <label className="text-xs font-semibold text-slate-300">Switch Sample Asset:</label>
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Switch Sample Asset:</label>
               <div className="grid grid-cols-3 gap-2">
                 {SAMPLE_PRESETS.map((sample) => (
                   <button
                     key={sample.name}
                     onClick={() => loadImage(sample.url, sample.name)}
-                    className="p-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left text-[11px] font-medium text-slate-300 flex items-center gap-1.5 truncate"
+                    className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-left text-[11px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5 truncate"
                   >
                     <img src={sample.url} alt={sample.name} className="w-5 h-5 rounded-xs object-cover" />
                     <span className="truncate">{sample.name.split(' ')[0]}</span>
@@ -1293,13 +1302,13 @@ export const ImageStudio = () => {
       {activeStudioTab === 'photoroom' && (
         <div className="space-y-4">
           {/* PHOTO AUTO-BRIDGE & PASTE ASSISTANT */}
-          <div className="p-4 bg-gradient-to-r from-blue-950/70 via-slate-900 to-indigo-950/70 border border-blue-500/40 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
+          <div className="p-4 bg-primary-50/70 dark:bg-slate-900 border border-primary-200 dark:border-slate-800 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
             <div className="flex items-center gap-3.5 w-full md:w-auto">
               <div className="relative shrink-0">
                 <img
                   src={getActiveStudioPhoto()}
                   alt="Ready Image"
-                  className="w-14 h-14 object-contain rounded-lg bg-slate-950 border border-blue-500/50 p-1 shadow-md"
+                  className="w-14 h-14 object-contain rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 p-1 shadow-xs"
                 />
                 <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -1308,18 +1317,18 @@ export const ImageStudio = () => {
               </div>
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Image Copied to Clipboard
+                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Image Ready on Clipboard
                   </span>
-                  <span className="text-[11px] text-sky-300 font-mono bg-sky-950/60 px-2 py-0.5 rounded border border-sky-800/40">
+                  <span className="text-[11px] text-primary-700 dark:text-primary-300 font-mono bg-primary-100/70 dark:bg-primary-950/60 px-2 py-0.5 rounded border border-primary-200 dark:border-primary-800/40">
                     Press Ctrl + V below
                   </span>
                 </div>
-                <h4 className="text-sm font-semibold text-white">
-                  PhotoRoom canvas par click karein aur bas <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-sky-300 font-mono text-xs">Ctrl + V</kbd> dabayein!
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  PhotoRoom canvas par click karein aur bas <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-primary-700 dark:text-primary-300 font-mono text-xs">Ctrl + V</kbd> dabayein!
                 </h4>
-                <p className="text-[11px] text-slate-300">
-                  External website security (CORS) ki wajah se browser direct inject nahi hone deta, lekin <strong className="text-white">Ctrl + V</strong> karte hi photo turant load ho jayegi.
+                <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                  External website security (CORS) ki wajah se browser direct inject nahi hone deta, lekin <strong className="text-slate-900 dark:text-white">Ctrl + V</strong> karte hi photo turant load ho jayegi.
                 </p>
               </div>
             </div>
@@ -1328,7 +1337,7 @@ export const ImageStudio = () => {
               <Button
                 size="sm"
                 onClick={() => copyPhotoToClipboard()}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8 font-medium shadow-xs"
+                className="bg-primary-600 hover:bg-primary-700 text-white text-xs h-8 font-medium shadow-xs"
               >
                 <Copy className="w-3.5 h-3.5 mr-1.5" />
                 {clipboardCopied ? 'Copied to Clipboard!' : 'Re-Copy (Ctrl+V)'}
@@ -1337,7 +1346,7 @@ export const ImageStudio = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => handleDownloadCropped('png')}
-                className="border-slate-700 text-slate-300 hover:bg-slate-800 text-xs h-8"
+                className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs h-8"
                 title="Download PNG to drag directly into PhotoRoom"
               >
                 <Download className="w-3.5 h-3.5 mr-1.5" /> Download to Drag
@@ -1346,7 +1355,7 @@ export const ImageStudio = () => {
                 variant="outline"
                 size="sm"
                 onClick={handleOpenCutoutWithCropped}
-                className="border-sky-500/40 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 text-xs h-8"
+                className="border-primary-200 dark:border-primary-500/40 bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-500/20 text-xs h-8"
                 title="Use ERP built-in cutout without external websites"
               >
                 <Scissors className="w-3.5 h-3.5 mr-1.5" /> Native Cutout
@@ -1354,16 +1363,16 @@ export const ImageStudio = () => {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-slate-900 border border-slate-800 rounded-xl">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-slate-800 text-slate-200 flex items-center justify-center shrink-0 border border-slate-700">
-                <Scissors className="w-4 h-4 text-sky-400" />
+              <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700">
+                <Scissors className="w-4 h-4 text-primary-500" />
               </div>
               <div className="text-xs">
-                <p className="font-semibold text-white">
+                <p className="font-semibold text-slate-900 dark:text-white">
                   PhotoRoom AI Engine (Live Cloud Workspace)
                 </p>
-                <p className="text-slate-400 text-[11px]">
+                <p className="text-slate-500 dark:text-slate-400 text-[11px]">
                   Background remove hone ke baad transparent PNG download karein aur neeche "Upload Cutout to Cloudinary" se direct ERP me save karein.
                 </p>
               </div>
@@ -1374,15 +1383,15 @@ export const ImageStudio = () => {
                 href="https://www.photoroom.com/tools/background-remover"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
               >
-                <ExternalLink className="w-3.5 h-3.5 text-blue-400" /> Open Dedicated Tab
+                <ExternalLink className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" /> Open Dedicated Tab
               </a>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setIframeKey((k) => k + 1)}
-                className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 title="Reload"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -1391,11 +1400,11 @@ export const ImageStudio = () => {
           </div>
 
           {/* EMBEDDED PHOTOROOM STUDIO */}
-          <div className="relative bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl min-h-[760px]">
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs min-h-[760px]">
             {!iframeLoaded && (
-              <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center z-10">
-                <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mb-3" />
-                <p className="text-xs font-medium text-slate-300">
+              <div className="absolute inset-0 bg-slate-50/90 dark:bg-slate-950/90 flex flex-col items-center justify-center z-10 backdrop-blur-xs">
+                <div className="w-8 h-8 border-3 border-primary-500 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
                   Loading PhotoRoom Engine...
                 </p>
               </div>
@@ -1412,12 +1421,12 @@ export const ImageStudio = () => {
           </div>
 
           {/* Action to upload Cutout to Cloud Media */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
             <div className="text-xs">
-              <h4 className="font-semibold text-white">
+              <h4 className="font-semibold text-slate-900 dark:text-white">
                 Upload your cutout to Cloud Media
               </h4>
-              <p className="text-slate-400 mt-0.5">
+              <p className="text-slate-500 dark:text-slate-400 mt-0.5">
                 Generate an instant Cloudinary public share URL for WhatsApp or e-commerce listings.
               </p>
             </div>
@@ -1430,7 +1439,7 @@ export const ImageStudio = () => {
                 setShowCloudModal(true);
               }}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+              className="bg-primary-600 hover:bg-primary-700 text-white font-medium shadow-xs"
             >
               <UploadCloud className="w-4 h-4 mr-1.5" /> Upload Cutout to Cloudinary
             </Button>
@@ -1448,7 +1457,7 @@ export const ImageStudio = () => {
           <form onSubmit={handleCloudUploadSubmit} className="space-y-4">
             <div
               onClick={() => cloudDropInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center cursor-pointer hover:border-blue-500 bg-slate-950 transition-colors"
+              className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-6 text-center cursor-pointer hover:border-primary-500 bg-slate-50 dark:bg-slate-950 transition-colors"
             >
               <input
                 type="file"
@@ -1467,12 +1476,12 @@ export const ImageStudio = () => {
               {cloudPreview ? (
                 <div className="flex flex-col items-center">
                   <img src={cloudPreview} alt="Upload preview" className="max-h-36 object-contain rounded-lg mb-2" />
-                  <p className="text-xs font-medium text-blue-400">{cloudFile?.name}</p>
+                  <p className="text-xs font-medium text-primary-600 dark:text-primary-400">{cloudFile?.name}</p>
                 </div>
               ) : (
                 <>
                   <UploadCloud className="w-7 h-7 text-slate-400 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-slate-200">
+                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                     Drop your image or cutout here
                   </p>
                   <p className="text-[11px] text-slate-500 mt-1">
@@ -1483,7 +1492,7 @@ export const ImageStudio = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Asset Title *
               </label>
               <input
@@ -1491,19 +1500,19 @@ export const ImageStudio = () => {
                 required
                 value={cloudTitle}
                 onChange={(e) => setCloudTitle(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-hidden focus:border-blue-500"
+                className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:outline-hidden focus:border-primary-500"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Category
                 </label>
                 <select
                   value={cloudCategory}
                   onChange={(e) => setCloudCategory(e.target.value)}
-                  className="w-full p-2 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-hidden"
+                  className="w-full p-2 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:outline-hidden"
                 >
                   <option value="Products">Products</option>
                   <option value="Banners">Banners</option>
@@ -1514,7 +1523,7 @@ export const ImageStudio = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Tags (comma separated)
                 </label>
                 <input
@@ -1522,7 +1531,7 @@ export const ImageStudio = () => {
                   value={cloudTags}
                   onChange={(e) => setCloudTags(e.target.value)}
                   placeholder="cutout, transparent"
-                  className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-hidden"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:outline-hidden"
                 />
               </div>
             </div>
@@ -1536,27 +1545,27 @@ export const ImageStudio = () => {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={uploadingToCloud || !cloudFile} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button type="submit" disabled={uploadingToCloud || !cloudFile} className="bg-primary-600 hover:bg-primary-700 text-white">
                 {uploadingToCloud ? 'Uploading...' : 'Save to Cloudinary'}
               </Button>
             </div>
           </form>
         ) : (
           <div className="space-y-4 text-center py-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-950/80 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-800">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto border border-emerald-200 dark:border-emerald-800">
               <CheckCheck className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="font-semibold text-sm text-white">
+              <h4 className="font-semibold text-sm text-slate-900 dark:text-white">
                 Uploaded to Cloudinary Successfully
               </h4>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 A permanent public share URL has been generated.
               </p>
             </div>
 
-            <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-left">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+            <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-left">
+              <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
                 Direct Public Share URL
               </span>
               <div className="flex items-center gap-2">
@@ -1564,7 +1573,7 @@ export const ImageStudio = () => {
                   type="text"
                   readOnly
                   value={savedCloudUrl}
-                  className="w-full text-xs font-mono bg-slate-900 border border-slate-800 rounded-md px-2.5 py-1.5 text-slate-200 select-all"
+                  className="w-full text-xs font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md px-2.5 py-1.5 text-slate-800 dark:text-slate-200 select-all"
                 />
                 <Button
                   size="sm"
@@ -1573,7 +1582,7 @@ export const ImageStudio = () => {
                     setCopiedLink(true);
                     setTimeout(() => setCopiedLink(false), 2000);
                   }}
-                  className="shrink-0 bg-slate-800 hover:bg-slate-700 text-white"
+                  className="shrink-0 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-white"
                 >
                   {copiedLink ? 'Copied' : 'Copy'}
                 </Button>
@@ -1581,7 +1590,7 @@ export const ImageStudio = () => {
                   href={savedCloudUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200"
+                  className="p-2 rounded-md bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
@@ -1607,7 +1616,7 @@ export const ImageStudio = () => {
         title="Choose from Cloud Media Assets"
       >
         <div className="space-y-4">
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Select an image to load into the crop workspace:
           </p>
 
@@ -1628,16 +1637,16 @@ export const ImageStudio = () => {
                     loadImage(asset.url, asset.title);
                     setShowAssetPicker(false);
                   }}
-                  className="rounded-lg border border-slate-800 overflow-hidden cursor-pointer hover:border-blue-500 bg-slate-950 transition-colors"
+                  className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden cursor-pointer hover:border-primary-500 bg-white dark:bg-slate-950 transition-colors shadow-2xs"
                 >
-                  <div className="aspect-square bg-slate-900 flex items-center justify-center">
+                  <div className="aspect-square bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
                     <img
                       src={asset.url}
                       alt={asset.title}
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="p-2 text-[11px] font-medium text-slate-300 truncate">
+                  <div className="p-2 text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">
                     {asset.title}
                   </div>
                 </div>

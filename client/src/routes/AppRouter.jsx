@@ -20,6 +20,10 @@ import { Employees } from '../pages/Employees/Employees';
 import { Settings } from '../pages/Settings/Settings';
 import { MediaGallery } from '../pages/Media/MediaGallery';
 import { ImageStudio } from '../pages/Studio/ImageStudio';
+import { MarketplacePricing } from '../pages/Pricing/MarketplacePricing';
+import { WarehouseVisualizer } from '../pages/Warehouses/WarehouseVisualizer';
+import { RtoRiskManager } from '../pages/Orders/RtoRiskManager';
+import { LabelGenerator } from '../pages/Labels/LabelGenerator';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -74,9 +78,13 @@ export const AppRouter = () => {
         <Route path="products" element={<Products />} />
         <Route path="inventory" element={<Inventory />} />
         <Route path="orders" element={<Orders />} />
+        <Route path="rto-risk" element={<RtoRiskManager />} />
         <Route path="marketplaces" element={<Marketplaces />} />
+        <Route path="pricing" element={<MarketplacePricing />} />
         <Route path="purchases" element={<Purchases />} />
         <Route path="warehouses" element={<Warehouses />} />
+        <Route path="warehouse-visualizer" element={<WarehouseVisualizer />} />
+        <Route path="labels" element={<LabelGenerator />} />
         <Route path="customers" element={<Customers />} />
         <Route path="finance" element={<Finance />} />
         <Route path="reports" element={<Reports />} />

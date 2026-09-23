@@ -4,9 +4,11 @@ import { Category } from '../models/Category.js';
 import { Warehouse } from '../models/Warehouse.js';
 import { Inventory } from '../models/Inventory.js';
 import { MarketplaceListing } from '../models/MarketplaceListing.js';
+import { WarehouseBin } from '../models/WarehouseBin.js';
 import { INVENTORY_TRANSACTION_TYPES } from '../config/constants.js';
 import { inventoryService } from '../services/inventoryService.js';
 import { logAudit } from '../middlewares/auditMiddleware.js';
+import { emitSocketEvent } from '../services/socketService.js';
 
 // ================= CATEGORY CONTROLLERS =================
 export const getCategories = async (req, res) => {
@@ -468,12 +470,23 @@ export const updateProduct = async (req, res) => {
         }
       }
 
-      // Soft-delete removed variants
+      // Soft-delete removed variants and purge from warehouse racks
       for (const [vId, vDoc] of existingVarMap.entries()) {
         if (!processedVariantIds.has(vId) && variants.length > 0) {
           vDoc.isDeleted = true;
           await vDoc.save();
           await Inventory.deleteMany({ variantId: vId });
+
+          // Also purge variant from WarehouseBin
+          const bins = await WarehouseBin.find({
+            $or: [{ 'assignedSkus.variantId': vId }, { 'assignedSkus.sku': vDoc.sku }]
+          });
+          for (const bin of bins) {
+            bin.assignedSkus = bin.assignedSkus.filter((item) => String(item.variantId) !== String(vId) && item.sku !== vDoc.sku);
+            bin.currentUnits = bin.assignedSkus.reduce((s, item) => s + (item.quantity || 0), 0);
+            if (bin.currentUnits === 0 && bin.status === 'full') bin.status = 'available';
+            await bin.save();
+          }
         }
       }
     } else if (initialStock !== undefined && targetWarehouse) {
@@ -520,19 +533,58 @@ export const deleteProduct = async (req, res) => {
 
     product.isDeleted = true;
     await product.save();
+
+    const variants = await ProductVariant.find({ productId: id });
+    const variantIds = variants.map((v) => String(v._id));
+    const targetSkus = [product.sku, ...variants.map((v) => v.sku)].filter(Boolean);
+
     await ProductVariant.updateMany({ productId: id }, { isDeleted: true });
     await Inventory.deleteMany({ productId: id });
     await MarketplaceListing.deleteMany({ productId: id });
+
+    // Clean up Warehouse Bins real-time
+    const bins = await WarehouseBin.find({
+      $or: [
+        { 'assignedSkus.productId': id },
+        { 'assignedSkus.variantId': { $in: variantIds } },
+        { 'assignedSkus.sku': { $in: targetSkus } }
+      ]
+    });
+
+    const affectedWarehouseIds = new Set();
+    for (const bin of bins) {
+      if (bin.warehouseId) affectedWarehouseIds.add(String(bin.warehouseId));
+      bin.assignedSkus = bin.assignedSkus.filter((item) => {
+        const isProdMatch = String(item.productId) === String(id);
+        const isVarMatch = item.variantId && variantIds.includes(String(item.variantId));
+        const isSkuMatch = item.sku && targetSkus.includes(item.sku);
+        return !(isProdMatch || isVarMatch || isSkuMatch);
+      });
+      bin.currentUnits = bin.assignedSkus.reduce((sum, item) => sum + (item.quantity || 0), 0);
+      if (bin.currentUnits === 0 && bin.status === 'full') {
+        bin.status = 'available';
+      }
+      await bin.save();
+    }
+
+    // Broadcast Real-time Socket Event to all connected tabs/dashboards
+    emitSocketEvent('warehouse:bins_updated', {
+      action: 'product_deleted',
+      productId: id,
+      skus: targetSkus,
+      affectedWarehouseIds: Array.from(affectedWarehouseIds)
+    });
+    emitSocketEvent('product:deleted', { productId: id, skus: targetSkus });
 
     await logAudit({
       req,
       action: 'PRODUCT_DELETED',
       module: 'Products',
       entityId: id,
-      reason: 'Product soft deleted and inventory purged'
+      reason: 'Product soft deleted, inventory purged, and warehouse bins real-time cleansed'
     });
 
-    res.json({ success: true, message: 'Product deleted successfully' });
+    res.json({ success: true, message: 'Product deleted successfully and warehouse racks cleared' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -551,9 +603,50 @@ export const bulkUpdateProducts = async (req, res) => {
       await Product.updateMany({ _id: { $in: ids } }, { category: value });
     } else if (action === 'delete') {
       await Product.updateMany({ _id: { $in: ids } }, { isDeleted: true });
+      const variants = await ProductVariant.find({ productId: { $in: ids } });
+      const variantIds = variants.map((v) => String(v._id));
+      const deletedProducts = await Product.find({ _id: { $in: ids } }).select('sku');
+      const targetSkus = [
+        ...deletedProducts.map((p) => p.sku),
+        ...variants.map((v) => v.sku)
+      ].filter(Boolean);
+
       await ProductVariant.updateMany({ productId: { $in: ids } }, { isDeleted: true });
       await Inventory.deleteMany({ productId: { $in: ids } });
       await MarketplaceListing.deleteMany({ productId: { $in: ids } });
+
+      // Clean up Warehouse Bins real-time for bulk deleted products
+      const bins = await WarehouseBin.find({
+        $or: [
+          { 'assignedSkus.productId': { $in: ids } },
+          { 'assignedSkus.variantId': { $in: variantIds } },
+          { 'assignedSkus.sku': { $in: targetSkus } }
+        ]
+      });
+
+      const affectedWarehouseIds = new Set();
+      for (const bin of bins) {
+        if (bin.warehouseId) affectedWarehouseIds.add(String(bin.warehouseId));
+        bin.assignedSkus = bin.assignedSkus.filter((item) => {
+          const isProdMatch = item.productId && ids.map(String).includes(String(item.productId));
+          const isVarMatch = item.variantId && variantIds.includes(String(item.variantId));
+          const isSkuMatch = item.sku && targetSkus.includes(item.sku);
+          return !(isProdMatch || isVarMatch || isSkuMatch);
+        });
+        bin.currentUnits = bin.assignedSkus.reduce((sum, item) => sum + (item.quantity || 0), 0);
+        if (bin.currentUnits === 0 && bin.status === 'full') {
+          bin.status = 'available';
+        }
+        await bin.save();
+      }
+
+      emitSocketEvent('warehouse:bins_updated', {
+        action: 'bulk_products_deleted',
+        productIds: ids,
+        skus: targetSkus,
+        affectedWarehouseIds: Array.from(affectedWarehouseIds)
+      });
+      emitSocketEvent('product:deleted', { productIds: ids, skus: targetSkus });
     }
 
     await logAudit({

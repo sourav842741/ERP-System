@@ -13,9 +13,11 @@ const ACCENT_COLORS = [
   { id: 'indigo', name: 'Indigo', bg: 'bg-indigo-600' },
   { id: 'blue', name: 'Ocean Blue', bg: 'bg-blue-600' },
   { id: 'emerald', name: 'Emerald', bg: 'bg-emerald-600' },
-  { id: 'violet', name: 'Purple Violet', bg: 'bg-violet-600' },
+  { id: 'violet', name: 'Royal Violet', bg: 'bg-violet-600' },
   { id: 'rose', name: 'Crimson Rose', bg: 'bg-rose-600' },
-  { id: 'amber', name: 'Amber Orange', bg: 'bg-amber-600' }
+  { id: 'amber', name: 'Sunset Amber', bg: 'bg-amber-600' },
+  { id: 'cyan', name: 'Deep Cyan', bg: 'bg-cyan-600' },
+  { id: 'slate', name: 'Neutral Slate', bg: 'bg-slate-700' }
 ];
 
 export const TopBar = ({ onOpenSidebar, onOpenSearch }) => {
@@ -87,9 +89,9 @@ export const TopBar = ({ onOpenSidebar, onOpenSearch }) => {
               <Palette className="w-4 h-4" />
             </button>
             {showPalette && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-3 z-50">
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-3 z-50">
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Accent Theme</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-1.5">
                   {ACCENT_COLORS.map((c) => (
                     <button
                       key={c.id}

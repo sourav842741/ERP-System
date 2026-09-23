@@ -75,6 +75,19 @@ const orderSchema = new mongoose.Schema({
     inspectionNotes: { type: String, default: '' },
     isRestocked: { type: Boolean, default: false }
   },
+  rtoRisk: {
+    score: { type: Number, default: 0 },
+    level: { type: String, enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], default: 'LOW' },
+    isFlagged: { type: Boolean, default: false },
+    reasons: [{ type: String }],
+    actionTaken: {
+      type: String,
+      enum: ['NONE', 'VERIFIED_CALL', 'CONVERTED_PREPAID', 'CANCELLED_FRAUD', 'WHITELISTED'],
+      default: 'NONE'
+    },
+    verifiedAt: { type: Date },
+    verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  },
   isDeleted: { type: Boolean, default: false }
 }, { timestamps: true });
 
